@@ -66,7 +66,7 @@ if ($to < $total_pages) {
 $html .= sprintf(
 /*html*/'<input type="hidden" name="search" value="%1$s" />
 ',
-	$_GET['search'] ?? '', // phpcs:ignore
+	(string) ($_GET['search'] ?? ''), // phpcs:ignore
 ); // 原本 search 參數
 $html .= '</div>'; // END pc-join
 $html .= '</form>';

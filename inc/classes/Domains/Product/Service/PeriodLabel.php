@@ -21,14 +21,19 @@ namespace J7\Powerhouse\Domains\Product\Service;
  */
 final class PeriodLabel {
 
-	/** @var '天' | '週' | '月' | '年' $period_label 訂閱週期標籤 */
+	/**
+	 * Period label
+	 *
+	 * @var string
+	 */
 	public string $period_label;
 
-	/** @var string $subscription_period 訂閱週期 */
+	/**
+	 * @param 'day'|'week'|'month'|'year' $period          訂閱週期
+	 * @param int                         $period_interval 訂閱週期間隔
+	 */
 	public function __construct(
-		/** @var 'day' | 'week' | 'month' | 'year' $period 訂閱週期 */
 		private string $period,
-		/** @var int $period_interval 訂閱週期間隔 */
 		private int $period_interval = 1
 	) {
 		$this->period_label = match ($this->period) {
@@ -36,7 +41,6 @@ final class PeriodLabel {
 			'week' => '週',
 			'month' => '月',
 			'year' => '年',
-			default => '',
 		};
 	}
 

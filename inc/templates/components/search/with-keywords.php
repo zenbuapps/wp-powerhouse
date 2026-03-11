@@ -5,13 +5,12 @@ use J7\Powerhouse\Domains\Post\Utils\CRUD as PostCRUD;
 
 global $post;
 
-/** @var array{post: \WP_Post} $args */
+/** @var array{post: \WP_Post|null} $args */
 @[
 	'post' => $the_post,
 ] = $args;
 
-// @phpstan-ignore-next-line
-$the_post = $the_post ?? $post;
+$the_post = ( $the_post instanceof \WP_Post ) ? $the_post : $post;
 
 if ( ! ( $the_post instanceof \WP_Post ) ) {
 	echo 'search keywords 區塊錯誤：$the_post 不是 WP_Post 實例';

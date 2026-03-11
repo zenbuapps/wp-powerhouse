@@ -591,7 +591,7 @@ class Settings extends DTO {
 			$value         = \get_option( self::PREFIX . $property_name, '' );
 
 			if ( in_array( $property_name, $this->bool_keys, true ) ) {
-				$this->{$property_name} = \wc_string_to_bool( $value );
+				$this->{$property_name} = \wc_string_to_bool( (string) $value );
 				continue;
 			}
 

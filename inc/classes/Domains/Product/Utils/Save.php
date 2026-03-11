@@ -40,9 +40,10 @@ class Save {
 	 */
 	public static function meta_data( \WC_Product &$product, array $meta_data = [] ): void {
 		// ----- ▼ 前端送 type 進來後，變更商品類型 ----- //
+		$is_subscription = false;
 		if (isset($meta_data['type'])) {
 			$old_type = $product->get_type();
-			$new_type = (string) $meta_data['type'] ?? '';
+			$new_type = (string) $meta_data['type'];
 			if ($old_type !== $new_type) {
 				\wp_remove_object_terms($product->get_id(), $old_type, 'product_type');
 				\wp_set_object_terms($product->get_id(), $new_type, 'product_type');
@@ -74,7 +75,7 @@ class Save {
 		foreach ( $meta_data as $key => $value ) {
 			\update_post_meta( $product->get_id(), $key, $value );
 			// 如果要用 update_meta_data 需要知道 mid
-			// $product->update_meta_data( $key, $value ); // @phpstan-ignore-line
+			// $product->update_meta_data( $key, $value );
 		}
 
 		\do_action('powerhouse/product/after_save_meta_data', $product, $meta_data);

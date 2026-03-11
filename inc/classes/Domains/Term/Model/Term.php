@@ -69,7 +69,7 @@ final class Term extends DTO {
 		$permalink = \is_wp_error( $permalink ) ? '' : $permalink;
 
 		$thumb_id      = \get_term_meta( $term->term_id, 'thumbnail_id', true );
-		$thumbnail_url = \wp_get_attachment_url(  $thumb_id );
+		$thumbnail_url = \wp_get_attachment_url( (int) $thumb_id );
 		$thumbnail_url = $thumbnail_url ? $thumbnail_url : '';
 
 		$order = \get_term_meta( $term->term_id, 'order', true );
@@ -86,10 +86,10 @@ final class Term extends DTO {
 			'parent'           => $term->parent ? (string) $term->parent : '',
 			'count'            => (int) $term->count,
 			'order'            => (int) $order,
-			'children'         => array_map(
+			'children'         => !\is_wp_error($children) ? array_map(
 				fn ( \WP_Term $child ) => self::instance( $child ),
 				$children
-			),
+			) : [],
 			'thumbnail_id'     => $thumbnail_url,
 		];
 
@@ -100,7 +100,7 @@ final class Term extends DTO {
 	/**
 	 * 轉換為陣列
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public function to_array(): array {
 		$array = parent::to_array();
@@ -110,9 +110,11 @@ final class Term extends DTO {
 			return $array;
 		}
 
+		/** @var array<Term> $children */
+		$children          = $array['children'];
 		$array['children'] = array_map(
 			fn ( Term $child ) => $child->to_array(),
-			$array['children']
+			$children
 		);
 
 		return $array;

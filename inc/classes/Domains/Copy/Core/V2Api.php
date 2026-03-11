@@ -37,7 +37,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request 包含更新選項所需資料的REST請求對象。
 	 * @return \WP_REST_Response 返回包含操作結果的REST響應對象。成功時返回選項資料，失敗時返回錯誤訊息。
 	 * @throws \Exception 當 id 不存在或不是數字時，拋出例外。
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_copy_with_id_callback( $request ): \WP_REST_Response {
 		$id = $request['id'] ?? null;

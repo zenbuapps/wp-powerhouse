@@ -22,7 +22,7 @@ class Compare {
 	public \DateTime $before_compared;
 
 
-	/** @var 'day' | 'week' | 'month' | 'year' 比較時間區間 type */
+	/** @var string 比較時間區間 type: 'day' | 'week' | 'month' | 'year' */
 	public string $compare_type;
 
 	/** @var int 比較時間區間 value */

@@ -8,8 +8,8 @@ use J7\WpUtils\Classes\DTO;
 use J7\Powerhouse\Domains\Subscription\Shared\Enums\Action;
 
 /**
-	 * Class Times
-	 * 訂閱的各時間點
+ * Class Times
+ * 訂閱的各時間點
  *  */
 final class Times extends DTO {
 

@@ -60,37 +60,12 @@ abstract class Info {
 	 * 轉換為訂單 INFO 陣列
 	 *
 	 * @param int $order_id 訂單 ID
-	 * @return array{
-	 * billing: array{
-	 * first_name: string,
-	 * last_name: string,
-	 * email: string,
-	 * phone: string,
-	 * company: string,
-	 * postcode: string,
-	 * country: string,
-	 * state: string,
-	 * city: string,
-	 * address_1: string,
-	 * address_2: string,
-	 * },
-	 * shipping: array{
-	 * first_name: string,
-	 * last_name: string,
-	 * email: string,
-	 * phone: string,
-	 * postcode: string,
-	 * country: string,
-	 * state: string,
-	 * city: string,
-	 * address_1: string,
-	 * address_2: string,
-	 * }
-	 * }
+	 * @return array<string, array<string, mixed>>
 	 */
 	public static function to_order_array( int $order_id ): array {
 		$order = \wc_get_order( $order_id );
 		if ( ! $order ) {
+			/** @var array<string, array<string, mixed>> */
 			return [];
 		}
 
@@ -113,33 +88,7 @@ abstract class Info {
 	 * 轉換為用戶 INFO 陣列
 	 *
 	 * @param int $user_id 用戶 ID
-	 * @return array{
-	 * billing: array{
-	 * first_name: string,
-	 * last_name: string,
-	 * email: string,
-	 * phone: string,
-	 * company: string,
-	 * postcode: string,
-	 * country: string,
-	 * state: string,
-	 * city: string,
-	 * address_1: string,
-	 * address_2: string,
-	 * },
-	 * shipping: array{
-	 * first_name: string,
-	 * last_name: string,
-	 * email: string,
-	 * phone: string,
-	 * postcode: string,
-	 * country: string,
-	 * state: string,
-	 * city: string,
-	 * address_1: string,
-	 * address_2: string,
-	 * }
-	 * }
+	 * @return array<string, array<string, mixed>>
 	 */
 	public static function to_user_array( int $user_id ): array {
 		$user_array = [];

@@ -40,7 +40,6 @@ abstract class MetaCRUD {
 			'post_id'    => $post_id,
 			'user_id'    => $user_id,
 			'meta_key'   => $meta_key,
-			// @phpstan-ignore-next-line
 			'meta_value' => \maybe_serialize( $meta_value ),
 		];
 
@@ -64,7 +63,6 @@ abstract class MetaCRUD {
 			if ($exists) {
 				return $wpdb->update(
 					$table_name,
-					// @phpstan-ignore-next-line
 					[ 'meta_value' => \maybe_serialize( $meta_value ) ],
 					[ 'meta_id' => $exists ],
 					[ '%s' ],
@@ -114,7 +112,6 @@ abstract class MetaCRUD {
 					'post_id'    => $post_id,
 					'user_id'    => $user_id,
 					'meta_key'   => $meta_key,
-					// @phpstan-ignore-next-line
 					'meta_value' => \maybe_serialize( $meta_value ),
 				],
 				[ '%d', '%d', '%s', '%s' ]
@@ -125,7 +122,6 @@ abstract class MetaCRUD {
 			return $wpdb->update(
 				$table_name,
 				[ // data
-					// @phpstan-ignore-next-line
 					'meta_value' => \maybe_serialize( $meta_value ),
 				],
 				[ // where
@@ -146,14 +142,12 @@ abstract class MetaCRUD {
 			return $wpdb->update(
 				$table_name,
 				[ // data
-					// @phpstan-ignore-next-line
 					'meta_value' => \maybe_serialize( $meta_value ),
 				],
 				[ // where
 					'post_id'    => $post_id,
 					'user_id'    => $user_id,
 					'meta_key'   => $meta_key,
-					// @phpstan-ignore-next-line
 					'meta_value' => \maybe_serialize( $prev_value ),
 				],
 				[ // format
@@ -282,7 +276,6 @@ abstract class MetaCRUD {
 					'post_id'    => $post_id,
 					'user_id'    => $user_id,
 					'meta_key'   => $meta_key,
-					// @phpstan-ignore-next-line
 					'meta_value' => \maybe_serialize($meta_value),
 				],
 				[

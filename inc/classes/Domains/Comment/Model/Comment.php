@@ -39,16 +39,19 @@ final class Comment extends DTO {
 	 */
 	public static function instance( $comment_id ): self|null {
 		$comment = \get_comment( $comment_id );
-		if ( !$comment ) {
+		if ( ! ( $comment instanceof \WP_Comment ) ) {
 			return null;
 		}
+
+		/** @var string $is_customer_note_raw */
+		$is_customer_note_raw = \get_comment_meta( $comment_id, 'is_customer_note', true );
 
 		$comment_data = [
 			'id'                => (string) $comment->comment_ID,
 			'date_created'      => $comment->comment_date,
 			'content'           => \wpautop( $comment->comment_content ),
 			'added_by'          => $comment->comment_author,
-			'is_customer_note'  => \wc_string_to_bool( \get_comment_meta( $comment_id, 'is_customer_note', true ) ),
+			'is_customer_note'  => \wc_string_to_bool( $is_customer_note_raw ),
 			'user_id'           => (string) $comment->user_id,
 			'commented_user_id' => (string) \get_comment_meta( $comment_id, 'commented_user_id', true ) ?: '0',
 		];

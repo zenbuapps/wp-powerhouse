@@ -132,12 +132,13 @@ class Theme {
 		if ( null === self::$instance ) {
 
 			$setting_array = \get_option(SettingsDTO::SETTINGS_KEY, []);
-			/** @var array<string, mixed> $theme_css */
-			$theme_css = $setting_array['theme_css'] ?? [];
-			$theme     = $setting_array['theme'] ?? 'power';
+			$setting_array = is_array($setting_array) ? $setting_array : [];
+			$theme_css     = $setting_array['theme_css'] ?? [];
+			$theme         = $setting_array['theme'] ?? 'power';
 
-			$theme_css                 = is_array($theme_css) ? $theme_css : []; // @phpstan-ignore-line
-			$theme_css['theme']        = $theme ?? 'power';
+			/** @var array<string, mixed> $theme_css */
+			$theme_css                 = is_array($theme_css) ? $theme_css : [];
+			$theme_css['theme']        = is_string($theme) ? $theme : 'power';
 			$theme_css['color_scheme'] = $theme_css['color-scheme'] ?? 'light';
 			unset($theme_css['color-scheme']);
 

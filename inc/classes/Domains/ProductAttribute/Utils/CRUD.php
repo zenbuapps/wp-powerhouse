@@ -12,17 +12,17 @@ abstract class CRUD {
 	 *
 	 * @see https://wp-kama.com/plugin/woocommerce/function/wc_create_attribute
 	 * @param array{
-	 * name: string,
-	 * slug: string,
-	 * type: string,
-	 * order_by: string,
-	 * has_archives: boolean,
+	 * name?: string,
+	 * slug?: string,
+	 * type?: string,
+	 * order_by?: string,
+	 * has_archives?: boolean,
 	 * } $args Arguments.
 	 *
 	 * @return int|\WP_Error
 	 */
 	public static function create_product_attribute( array $args = [] ): int|\WP_Error {
-		$taxonomy = 'pa_' . $args['slug']; // 前綴 pa_ 是 WooCommerce的慣例
+		$taxonomy = 'pa_' . ( $args['slug'] ?? '' ); // 前綴 pa_ 是 WooCommerce的慣例
 		if (\taxonomy_exists($taxonomy)) {
 			return new \WP_Error('taxonomy_exists', __('Taxonomy already exists', 'powerhouse'));
 		}
@@ -55,7 +55,7 @@ abstract class CRUD {
 	 *
 	 * @param int $id       product_attribute id.
 	 *
-	 * @return bool|int|\WP_Error
+	 * @return bool|\WP_Error
 	 */
 	public static function delete_product_attribute( int $id ): bool|\WP_Error {
 
@@ -73,18 +73,18 @@ abstract class CRUD {
 	 *
 	 * @param string|int $id   product attribute id.
 	 * @param array{
-	 * id: int,
-	 * name: string,
-	 * slug: string,
-	 * type: string,
-	 * order_by: string,
-	 * has_archives: boolean,
+	 * id?: int,
+	 * name?: string,
+	 * slug?: string,
+	 * type?: string,
+	 * order_by?: string,
+	 * has_archives?: boolean,
 	 * } $args Arguments.
 	 *
 	 * @return int|\WP_Error
 	 */
 	public static function update_product_attribute( string|int $id, array $args ): int|\WP_Error {
-		$result = \wc_update_attribute($id, $args);
+		$result = \wc_update_attribute( (int) $id, $args);
 		return $result;
 	}
 }

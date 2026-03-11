@@ -157,7 +157,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				\__('post id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -168,7 +168,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				\__('post not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -205,7 +205,6 @@ final class V2Api extends ApiBase {
 	 *
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當文章不存在時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public static function get_post_field_name_with_id_callback( $request ) { // phpcs:ignore
 		$id = $request['id'] ?? null;
@@ -213,7 +212,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				\__('post id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -224,18 +223,15 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				\__('post not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
 
 		$field_name = $request['field_name'] ?? null;
-		if (!$field_name) {
+		if (!is_string($field_name) || $field_name === '') {
 			throw new \Exception(
-				sprintf(
-				__('field name is required #%s', 'powerhouse'),
-				$field_name
-			)
+				__('field name is required', 'powerhouse')
 			);
 		}
 		$field_name   = \sanitize_text_field( $field_name );
@@ -263,7 +259,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request 包含產品資訊的請求對象。
 	 * @throws \Exception 當找不到商品時拋出異常。.
 	 * @return array{data: array<string, mixed>, meta_data: array<string, mixed>} 包含產品對象、資料和元數據的陣列。
-	 * @phpstan-ignore-next-line
 	 */
 	private function separator( $request ): array {
 		$body_params = $request->get_body_params();
@@ -346,7 +341,6 @@ final class V2Api extends ApiBase {
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_posts_sort_callback( $request ): \WP_REST_Response|\WP_Error {
 
@@ -376,7 +370,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
 	 * @throws \Exception 當更新文章失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_posts_with_id_callback( $request ): \WP_REST_Response|\WP_Error {
 		$id = $request['id'] ?? null;
@@ -384,7 +377,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('post id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -421,11 +414,10 @@ final class V2Api extends ApiBase {
 	 * 批量刪除文章資料
 	 *
 	 * @param \WP_REST_Request $request Request.
-	 * @return \WP_REST_Response|\WP_Error
+	 * @return \WP_REST_Response
 	 * @throws \Exception 當刪除文章資料失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
-	public function delete_posts_callback( $request ): \WP_REST_Response|\WP_Error {
+	public function delete_posts_callback( $request ): \WP_REST_Response {
 
 		$body_params = $request->get_json_params();
 
@@ -464,7 +456,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當刪除文章失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function delete_posts_with_id_callback( $request ): \WP_REST_Response {
 		$id = $request['id'] ?? null;
@@ -472,7 +463,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('post id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}

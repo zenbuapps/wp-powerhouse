@@ -45,9 +45,13 @@ final class MetaQueryBuilder {
 	 * ]
 	 */
 	public function __construct( protected array $raw_meta_query ) {
-		$this->relation = $this->raw_meta_query['relation'] ?? 'AND';
+		$this->relation = isset($this->raw_meta_query['relation']) ? (string) $this->raw_meta_query['relation'] : 'AND';
 		unset( $raw_meta_query['relation'] );
 		foreach ( $raw_meta_query as $clause ) {
+			if (!is_array($clause)) {
+				continue;
+			}
+			/** @var array<string, mixed> $clause */
 			$this->clauses[] = new Clause( $clause );
 		}
 	}
@@ -59,7 +63,11 @@ final class MetaQueryBuilder {
 	 * @return Clause|null
 	 */
 	public function find( string $key ): Clause|null {
-		return General::array_find( $this->clauses, fn( $clause ) => $clause->key === $key );
+		$result = General::array_find( $this->clauses, fn( Clause $clause ) => $clause->key === $key );
+		if ($result instanceof Clause) {
+			return $result;
+		}
+		return null;
 	}
 
 	/**
@@ -91,7 +99,7 @@ final class MetaQueryBuilder {
 	/**
 	 * 取得 meta_query 的參數
 	 *
-	 * @return array<string, mixed>
+	 * @return array<int|string, mixed>
 	 */
 	public function get_meta_query(): array {
 		if ( !$this->clauses ) {

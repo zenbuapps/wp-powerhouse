@@ -118,7 +118,10 @@ final class Copy {
 					continue;
 				}
 
-				\add_post_meta($new_id, $key, \wp_slash(\maybe_unserialize($value)));
+				$unserialized = \maybe_unserialize($value);
+				/** @var array<mixed>|string $slash_value */
+				$slash_value = is_array($unserialized) || is_string($unserialized) ? $unserialized : (string) $unserialized;
+				\add_post_meta($new_id, $key, \wp_slash($slash_value));
 			}
 		}
 

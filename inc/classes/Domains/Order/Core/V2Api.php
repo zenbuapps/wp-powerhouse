@@ -130,14 +130,17 @@ final class V2Api extends ApiBase {
 		// 將 '[]' 轉為 [], 'true' 轉為 true, 'false' 轉為 false
 		$args = General::parse( $args );
 
-		$query       = \wc_get_orders($args);
+		$query = \wc_get_orders($args);
+		if (!( $query instanceof \stdClass )) {
+			return new \WP_REST_Response([]);
+		}
 		$orders      = $query->orders;
 		$total       = $query->total;
 		$total_pages = $query->max_num_pages;
 
 		$formatted_orders = [];
 		foreach ($orders as $order) {
-			/** @var \WP_Post $post */
+			/** @var \WC_Order $order */
 			$formatted_orders[] = CRUD::format_order_details($order );
 		}
 
@@ -170,18 +173,18 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('post id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
 
 		$order = \wc_get_order( (int) $id );
 
-		if (!$order) {
+		if (!( $order instanceof \WC_Order )) {
 			throw new \Exception(
 				sprintf(
 				__('order not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -195,7 +198,7 @@ final class V2Api extends ApiBase {
 		// 將 '[]' 轉為 [], 'true' 轉為 true, 'false' 轉為 false
 		$params = General::parse( $params );
 
-		/** @var \WP_Post $post */
+		/** @var \WC_Order $order */
 		$formatted_order = CRUD::format_order_details( $order, true );
 
 		$response = new \WP_REST_Response( $formatted_order );
@@ -279,10 +282,12 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
 	 * @throws \Exception 當新增訂單失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_orders_callback( $request ): \WP_REST_Response|\WP_Error {
 		$order = \wc_create_order();
+		if ($order instanceof \WP_Error) {
+			return $order;
+		}
 		$order->set_status('pending');
 		$order->save();
 
@@ -310,7 +315,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('post id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -399,7 +404,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當刪除文章失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function delete_orders_with_id_callback( $request ): \WP_REST_Response {
 		$id = $request['id'] ?? null;
@@ -407,7 +411,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('post id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -416,7 +420,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('order not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -425,7 +429,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('delete order failed #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -445,29 +449,28 @@ final class V2Api extends ApiBase {
 	 * 新增訂單備註
 	 *
 	 * @param \WP_REST_Request $request Request.
-	 * @return \WP_REST_Response|\WP_Error
-	 * @phpstan-ignore-next-line
+	 * @return \WP_REST_Response
 	 * @throws \Exception 當新增訂單備註失敗時拋出異常
 	 */
-	public function post_order_notes_callback( $request ): \WP_REST_Response|\WP_Error {
+	public function post_order_notes_callback( $request ): \WP_REST_Response {
 		$body_params = $request->get_body_params();
 		WP::include_required_params( $body_params, [ 'order_id', 'note', 'is_customer_note' ] );
-		[
-			'order_id' => $order_id,
-			'note' => $note,
-			'is_customer_note' => $is_customer_note, // 0 = false, 1 = true
-		] = WP::sanitize_text_field_deep( $body_params );
+		/** @var array<string, string> $sanitized_params */
+		$sanitized_params = WP::sanitize_text_field_deep( $body_params );
+		$order_id         = $sanitized_params['order_id'] ?? '';
+		$note             = $sanitized_params['note'] ?? '';
+		$is_customer_note = $sanitized_params['is_customer_note'] ?? '0';
 
 		$order = \wc_get_order( (int) $order_id );
-		if (!$order) {
+		if (!( $order instanceof \WC_Order )) {
 			throw new \Exception(
 				sprintf(
 					__('order not found #%s', 'powerhouse'),
-					$order_id
+					(string) $order_id
 				)
 			);
 		}
-		$comment_id = $order->add_order_note($note, (int) $is_customer_note, true);
+		$comment_id = $order->add_order_note( (string) $note, (int) $is_customer_note, true);
 
 		return new \WP_REST_Response(
 			[
@@ -483,7 +486,6 @@ final class V2Api extends ApiBase {
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
-	 * @phpstan-ignore-next-line
 	 * @throws \Exception 當刪除訂單備註失敗時拋出異常
 	 */
 	public function delete_order_notes_with_id_callback( $request ): \WP_REST_Response {
@@ -492,7 +494,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 					__('order note id format not match #%s', 'powerhouse'),
-					$id
+					(string) $id
 				)
 			);
 		}

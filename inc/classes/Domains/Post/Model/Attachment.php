@@ -79,8 +79,11 @@ final class Attachment extends DTO {
 	public static function instance( \WP_Post $post ): self {
 
 		$attachment_info = \wp_prepare_attachment_for_js( $post );
-		$subtype         = self::get_subtype( $attachment_info );
-		$img_url         = self::get_image_url( $attachment_info, $subtype);
+		if (!is_array($attachment_info)) {
+			$attachment_info = [];
+		}
+		$subtype = self::get_subtype( $attachment_info );
+		$img_url = self::get_image_url( $attachment_info, $subtype);
 
 		// filename 取得 . 後面的附檔名
 
@@ -95,10 +98,10 @@ final class Attachment extends DTO {
 			'_wp_attachment_image_alt' => $attachment_info['alt'] ?? '',
 			'description'              => $post->post_content,
 			'short_description'        => $post->post_excerpt,
-			'type'                     => $attachment_info['type'] ?: '',
+			'type'                     => isset($attachment_info['type']) ? (string) $attachment_info['type'] : '',
 			'mime'                     => $post->post_mime_type,
 			'subtype'                  => self::get_subtype( $attachment_info ),
-			'edit_link'                => $attachment_info['editLink'] ?: '',
+			'edit_link'                => isset($attachment_info['editLink']) ? (string) $attachment_info['editLink'] : '',
 			'filesize_human_readable'  => $attachment_info['filesizeHumanReadable'] ?? '',
 			'height'                   => $attachment_info['height'] ?? null,
 			'width'                    => $attachment_info['width'] ?? null,
@@ -106,7 +109,7 @@ final class Attachment extends DTO {
 			'date_modified'            => $post->post_modified,
 			'author'                   => [
 				'id'   => (string) $post->post_author,
-				'name' => \get_the_author_meta( 'display_name', $post->post_author ),
+				'name' => \get_the_author_meta( 'display_name', (int) $post->post_author ),
 			],
 		];
 
@@ -117,13 +120,13 @@ final class Attachment extends DTO {
 	/**
 	 * 取得圖片 URL
 	 *
-	 * @param array{subtype: string, url: string} $attachment_info 附件資訊
-	 * @param string                              $subtype 子類型
+	 * @param array<string, mixed> $attachment_info 附件資訊
+	 * @param string               $subtype 子類型
 	 * @return string 圖片 URL
 	 */
 	private static function get_image_url( array $attachment_info, string $subtype ): string {
-		$url = $attachment_info['url'] ?? '';
-		if ('image' === $attachment_info['type']) {
+		$url = isset($attachment_info['url']) ? (string) $attachment_info['url'] : '';
+		if ('image' === ( $attachment_info['type'] ?? '' )) {
 			return $url;
 		}
 
@@ -179,17 +182,17 @@ final class Attachment extends DTO {
 	/**
 	 * 取得附檔名
 	 *
-	 * @param array{subtype: string, filename: string} $attachment_info 附件資訊
+	 * @param array<string, mixed> $attachment_info 附件資訊
 	 * @return string 附檔名
 	 */
 	private static function get_subtype( array $attachment_info ): string {
-		$subtype = $attachment_info['subtype'] ?? '';
+		$subtype = isset($attachment_info['subtype']) ? (string) $attachment_info['subtype'] : '';
 		if ($subtype) {
 			return $subtype;
 		}
-		$filename = $attachment_info['filename'] ?? '';
+		$filename = isset($attachment_info['filename']) ? (string) $attachment_info['filename'] : '';
 		// 不論 filename 有幾個 . 取得最後一個 . 後面的附檔名
-		$subtype = \explode( '.', $filename );
-		return $subtype[ \count( $subtype ) - 1 ] ?? $filename;
+		$parts = \explode( '.', $filename );
+		return $parts[ \count( $parts ) - 1 ];
 	}
 }

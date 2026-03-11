@@ -5,21 +5,24 @@
 
 global $post;
 
-/** @var array{post: WP_Post|null, post_type: string|null} $args */
+/** @var array{post: WP_Post|null, post_type: string|null, title: string|null} $args */
 @[
 	'post'      => $the_post,
 	'post_type' => $the_post_type,
 	'title'     => $the_title,
 ] = $args;
 
-$the_post = $the_post ?? $post;
+$the_post = ( $the_post instanceof \WP_Post ) ? $the_post : $post;
 
+if ( ! ( $the_post instanceof \WP_Post ) ) {
+	return;
+}
 
 /** @var array<int, WP_Post> $children_posts */
 $children_posts = \get_children(
 	[
 		'post_parent' => $the_post->ID,
-		'post_type'   => $the_post_type ? $the_post_type : $the_post->post_type,
+		'post_type'   => !empty($the_post_type) ? (string) $the_post_type : $the_post->post_type,
 		'post_status' => 'publish',
 		'numberposts' => -1,
 		'orderby'     => [

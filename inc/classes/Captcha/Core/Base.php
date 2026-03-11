@@ -36,8 +36,8 @@ abstract class Base {
 	/** @var string 驗證碼 nonce 名稱 */
 	protected $nonce_action = 'powerhouse_captcha_nonce';
 
-	/** @var login|register 驗證碼容器 class 用來區分是 login 還是 register */
-	protected $container_class = 'login';
+	/** @var string 驗證碼容器 class 用來區分是 login 還是 register */
+	protected string $container_class = 'login';
 
 	/** Constructor */
 	public function __construct() {

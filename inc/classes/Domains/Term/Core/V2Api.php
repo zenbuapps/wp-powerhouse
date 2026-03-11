@@ -31,7 +31,7 @@ final class V2Api extends ApiBase {
 	/**
 	 * APIs
 	 *
-	 * @var array{endpoint:string,method:string,permission_callback: ?callable, callback: ?callable}[]
+	 * @var array{endpoint:string,method:string,permission_callback?: ?callable, callback?: ?callable }[]
 	 */
 	protected $apis = [
 		[
@@ -139,8 +139,8 @@ final class V2Api extends ApiBase {
 	 */
 	private static function get_terms_by_order( array $args ): array {
 		// 將 posts_per_page, paged 轉換為 number offset
-		$args['number'] = $args['posts_per_page'] <= 0 ? 0 : $args['posts_per_page'];
-		$args['offset'] = ( $args['paged'] - 1 ) * $args['number'];
+		$args['number'] = (int) $args['posts_per_page'] <= 0 ? 0 : (int) $args['posts_per_page'];
+		$args['offset'] = ( (int) $args['paged'] - 1 ) * (int) $args['number'];
 		unset($args['posts_per_page']);
 		unset($args['paged']);
 
@@ -219,7 +219,7 @@ final class V2Api extends ApiBase {
 
 		$params = WP::sanitize_text_field_deep( $params, false );
 
-		$taxonomy = $request['taxonomy'] ?? 'product_cat';
+		$taxonomy = (string) ( $request['taxonomy'] ?? 'product_cat' );
 
 		$default_args = [
 			'taxonomy'       => $taxonomy,
@@ -247,7 +247,7 @@ final class V2Api extends ApiBase {
 		/** @var int $total */
 		$total = \get_terms($count_args);
 
-		$total_pages = $args['posts_per_page'] > 0 ? \ceil($total / $args['posts_per_page']) : 1;
+		$total_pages = (int) $args['posts_per_page'] > 0 ? \ceil( (int) $total / (int) $args['posts_per_page']) : 1;
 
 		$formatted_terms = [];
 		foreach ($terms as $term) {
@@ -281,13 +281,13 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('term id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
 		$params   = $request->get_query_params();
 		$params   = WP::sanitize_text_field_deep( $params, false );
-		$taxonomy = $request['taxonomy'] ?? '';
+		$taxonomy = (string) ( $request['taxonomy'] ?? '' );
 
 		$term = \get_term( (int) $id, $taxonomy );
 
@@ -295,13 +295,22 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('term not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
 
 		if (\is_wp_error($term)) {
 			throw new \Exception($term->get_error_message());
+		}
+
+		if (!( $term instanceof \WP_Term )) {
+			throw new \Exception(
+				sprintf(
+				__('term not found #%s', 'powerhouse'),
+				(string) $id
+			)
+			);
 		}
 
 		$term_array = Term::instance( $term );
@@ -323,7 +332,7 @@ final class V2Api extends ApiBase {
 	public static function post_terms_callback( $request ): \WP_REST_Response|\WP_Error {
 		$body_params = $request->get_body_params();
 		$body_params = WP::sanitize_text_field_deep( $body_params, false );
-		$taxonomy    = $request['taxonomy'] ?? '';
+		$taxonomy    = (string) ( $request['taxonomy'] ?? '' );
 
 		$qty = (int) ( $body_params['qty'] ?? 1 );
 		unset($body_params['qty']);
@@ -357,7 +366,6 @@ final class V2Api extends ApiBase {
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
-	 * @phpstan-ignore-next-line
 	 */
 	public static function post_terms_sort_callback( $request ): \WP_REST_Response|\WP_Error {
 
@@ -365,7 +373,7 @@ final class V2Api extends ApiBase {
 
 		$body_params = WP::sanitize_text_field_deep( $body_params, false );
 
-		$taxonomy = $request['taxonomy'] ?? '';
+		$taxonomy = (string) ( $request['taxonomy'] ?? '' );
 
 		/** @var array{from_tree: array<array{id: string}>, to_tree: array<array{id: string}>} $body_params */
 		$sort_result = CRUD::sort_terms( $taxonomy, $body_params );
@@ -389,7 +397,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
 	 * @throws \Exception 當更新 term 失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public static function post_terms_with_id_callback( $request ): \WP_REST_Response|\WP_Error {
 		$id = $request['id'] ?? null;
@@ -397,14 +404,14 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('term id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
 
 		$body_params = $request->get_body_params();
 		$body_params = WP::sanitize_text_field_deep( $body_params );
-		$taxonomy    = $request['taxonomy'] ?? '';
+		$taxonomy    = (string) ( $request['taxonomy'] ?? '' );
 
 		/** @var array<string, mixed> $body_params */
 		$body_params = \apply_filters('powerhouse/term/update_term_args', $body_params, $request);
@@ -449,7 +456,7 @@ final class V2Api extends ApiBase {
 		$ids = $body_params['ids'] ?? [];
 		/** @var array<string> $ids */
 		$ids      = is_array( $ids ) ? $ids : [];
-		$taxonomy = $request['taxonomy'] ?? '';
+		$taxonomy = (string) ( $request['taxonomy'] ?? '' );
 
 		foreach ($ids as $id) {
 			CRUD::delete_term( (int) $id, $taxonomy );
@@ -471,7 +478,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當刪除 term 失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public static function delete_terms_with_id_callback( $request ): \WP_REST_Response {
 		$id = $request['id'] ?? null;
@@ -479,12 +485,12 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('term id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
 
-		$taxonomy = $request['taxonomy'] ?? '';
+		$taxonomy = (string) ( $request['taxonomy'] ?? '' );
 
 		CRUD::delete_term( (int) $id, $taxonomy );
 

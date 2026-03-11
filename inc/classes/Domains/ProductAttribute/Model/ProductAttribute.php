@@ -18,10 +18,10 @@ final class ProductAttribute extends DTO {
 	/** @var string $slug */
 	public string $slug;
 
-	/** @var select|text $type 類型 */
+	/** @var 'select'|'text' $type 類型 */
 	public string $type = 'select';
 
-	/** @var menu_order|name|name_num|id $order_by 排序 */
+	/** @var 'menu_order'|'name'|'name_num'|'id' $order_by 排序 */
 	public string $order_by = 'menu_order';
 
 	/** @var bool $has_archives 是否顯示 */
@@ -33,7 +33,10 @@ final class ProductAttribute extends DTO {
 	 * @param int|string $id 商品屬性 ID
 	 */
 	public static function instance( int|string $id ): self {
-		$attribute     = \wc_get_attribute($id);
+		$attribute = \wc_get_attribute( (int) $id);
+		if (!$attribute) {
+			throw new \Exception("Attribute not found: {$id}");
+		}
 		$attribute->id = (string) $attribute->id;
 
 		$args = (array) $attribute;

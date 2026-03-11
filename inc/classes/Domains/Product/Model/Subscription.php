@@ -15,16 +15,16 @@ final class Subscription extends DTO {
 	/** @var 'day' | 'week' | 'month' | 'year' $subscription_period 訂閱週期 日/週/月/年 */
 	public string $subscription_period = 'month';
 
-	/** @var numeric-string $subscription_period_interval 訂閱週期間隔，每 {N} 個 日/週/月/年 */
+	/** @var string $subscription_period_interval 訂閱週期間隔，每 {N} 個 日/週/月/年 */
 	public string $subscription_period_interval = '';
 
-	/** @var numeric-string $subscription_length 訂閱持續時間， {N} 個 日/週/月/年 */
+	/** @var string $subscription_length 訂閱持續時間， {N} 個 日/週/月/年 */
 	public string $subscription_length = '';
 
-	/** @var numeric-string $subscription_sign_up_fee 訂閱註冊費用 */
+	/** @var string $subscription_sign_up_fee 訂閱註冊費用 */
 	public string $subscription_sign_up_fee = '';
 
-	/** @var numeric-string $subscription_trial_length 試用期長度， {N} 個 日/週/月/年 */
+	/** @var string $subscription_trial_length 試用期長度， {N} 個 日/週/月/年 */
 	public string $subscription_trial_length = '';
 
 	/** @var 'day' | 'week' | 'month' | 'year' $subscription_trial_period 試用期週期（天、週、月、年） */
@@ -33,7 +33,7 @@ final class Subscription extends DTO {
 	/**
 	 * 轉換為陣列
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public function to_array(): array {
 		if (!class_exists('\WC_Subscriptions')) {

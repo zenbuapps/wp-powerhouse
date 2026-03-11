@@ -14,8 +14,8 @@ use J7\Powerhouse\Settings\Model\Settings;
 final class Register extends Base {
 	use \J7\WpUtils\Traits\SingletonTrait;
 
-	/** @var login|register 驗證碼容器 class 用來區分是 login 還是 register */
-	protected $container_class = 'register';
+	/** @var string 驗證碼容器 class 用來區分是 login 還是 register */
+	protected string $container_class = 'register';
 
 	/** Constructor */
 	public function __construct() {
@@ -32,11 +32,11 @@ final class Register extends Base {
 
 	/** 驗證碼驗證
 	 *
-	 * @param array    $data 用戶資料
-	 * @param bool     $update 是否更新
-	 * @param int|null $user_id 用戶ID
-	 * @param array    $userdata 用戶資料
-	 * @return array
+	 * @param array<string, mixed> $data 用戶資料
+	 * @param bool                 $update 是否更新
+	 * @param int|null             $user_id 用戶ID
+	 * @param array<string, mixed> $userdata 用戶資料
+	 * @return array<string, mixed>
 	 * @throws \Exception 驗證碼錯誤時拋出例外
 	 */
 	public function authenticate( array $data, bool $update, int|null $user_id, array $userdata ): array {
@@ -45,7 +45,7 @@ final class Register extends Base {
 		}
 
 		try {
-		$user_input = $_POST[ $this->captcha_name ] ?? ''; // phpcs:ignore
+		$user_input = (string) ( $_POST[ $this->captcha_name ] ?? '' ); // phpcs:ignore
 
 			if (!$user_input) {
 				throw new \Exception('缺少驗證碼，註冊已被取消。');
@@ -59,10 +59,8 @@ final class Register extends Base {
 		} catch (\Throwable $th) {
 			if (\wp_is_serving_rest_request() || \wp_doing_ajax()) {
 				\wp_send_json_error([ 'message' => $th->getMessage() ]);
-				exit;
 			}
 			\wp_die($th->getMessage());
-			exit;
 		}
 	}
 }

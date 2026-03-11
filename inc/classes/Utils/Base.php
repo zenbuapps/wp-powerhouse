@@ -106,11 +106,12 @@ abstract class Base {
 	 * @param array<int, mixed> $items 需要處理的項目陣列
 	 * @param callable          $callback 處理每個項目的回調函數，接收項目和索引參數，回傳布林值表示成功或失敗
 	 * @param array{
-	 *  batch_size: int,
-	 *  pause_ms: int,
-	 *  flush_cache: bool,
+	 *  batch_size?: int,
+	 *  pause_ms?: int,
+	 *  flush_cache?: bool,
+	 *  memory_limit?: string,
 	 * }    $options 設定選項
-	 * @return array 處理結果統計
+	 * @return array<string, mixed> 處理結果統計
 	 * @throws \Throwable 如果處理過程中發生錯誤，則拋出 \Throwable 異常
 	 */
 	public static function batch_process( array $items, callable $callback, array $options = [] ): array {
@@ -121,9 +122,9 @@ abstract class Base {
 			'memory_limit' => '128M', // 記憶體限制
 		];
 		// 記住原本的記憶體限制
-		$original_limit = ini_get('memory_limit');
+		$original_limit = ini_get('memory_limit') ?: '128M';
 
-		ini_set('memory_limit', $options['memory_limit']); // phpcs:ignore
+		ini_set('memory_limit', (string) ($options['memory_limit'] ?? '128M')); // phpcs:ignore
 
 		try {
 
@@ -139,7 +140,8 @@ abstract class Base {
 			];
 
 			// 分批處理
-			$batches = array_chunk($items, $options['batch_size']);
+			$batch_size = max(1, (int) $options['batch_size']);
+			$batches    = array_chunk($items, $batch_size);
 
 			foreach ($batches as $batch_index => $batch) {
 				// 處理每一批
@@ -180,11 +182,7 @@ abstract class Base {
 	/**
 	 * Get taxonomy options
 	 *
-	 * @param array{
-	 *  object_type: array<string>,
-	 *  public: bool,
-	 *  ...
-	 * } $args 參數
+	 * @param array<string, mixed> $args 參數
 	 * @see https://developer.wordpress.org/reference/functions/get_taxonomies/
 	 * @return array<array{value: string, label: string, hierarchical: bool}>
 	 */
@@ -223,15 +221,13 @@ abstract class Base {
 	 * @param array<string, mixed> $arr 要轉換的陣列
 	 * @param array{
 	 *  title?: string,
-	 *  br?: bool, 是否使用 <br> 不使用 table
+	 *  br?: bool,
 	 * } $options 選項
 	 * @return string
 	 */
 	public static function array_to_html( array $arr, array $options = [] ): string {
-		@[
-		'title' => $title,
-		'br' => $br, // 是否使用 <br> 不使用 table
-		] = $options;
+		$title = $options['title'] ?? null;
+		$br    = $options['br'] ?? null;
 
 		$html = '';
 
@@ -242,12 +238,12 @@ abstract class Base {
 		$html .= $br ? '' : '<table>';
 		foreach ( $arr as $key => $value ) {
 			try {
-				$value_stringify = match (gettype($value)) {
+				$value_stringify = (string) match (gettype($value)) {
 					'array' => json_encode($value),
 					'object' => $value instanceof \stdClass ? json_encode($value) : $value::class,
 					'boolean' => $value ? 'true' : 'false',
 					'NULL' => 'null',
-					default => $value,
+					default => (string) $value,
 				};
 			} catch (\Throwable $e) {
 				\J7\WpUtils\Classes\WC::logger(
@@ -257,7 +253,7 @@ abstract class Base {
 						'arr' => $arr,
 					]
 					);
-				$value_stringify = json_encode($value);
+				$value_stringify = (string) json_encode($value);
 			}
 
 			if ( $br ) {
@@ -284,6 +280,7 @@ abstract class Base {
 	 * @return string
 	 */
 	public static function format_sql( string $sql ): string {
-		return \wp_unslash( preg_replace('/\s+/', ' ', trim($sql)) );
+		$formatted = preg_replace('/\s+/', ' ', trim($sql));
+		return (string) \wp_unslash( $formatted ?? $sql );
 	}
 }

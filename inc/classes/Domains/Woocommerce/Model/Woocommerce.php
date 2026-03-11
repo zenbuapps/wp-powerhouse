@@ -58,7 +58,7 @@ class Woocommerce extends DTO {
 	/** 取得 ProductTypes @return self */
 	public static function instance(): self {
 		$countries = \WC()->countries->get_countries();
-		$currency  = \get_option( 'woocommerce_currency', 'TWD' );
+		$currency  = (string) \get_option( 'woocommerce_currency', 'TWD' );
 
 		$wc_settings = Settings::instance();
 

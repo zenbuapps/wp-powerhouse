@@ -46,8 +46,8 @@ final class Product extends DTO {
 	/**
 	 * 取得實例
 	 *
-	 * @param \WC_Product $product 商品
-	 * @param array       $meta_keys 要包含的 meta 欄位
+	 * @param \WC_Product   $product 商品
+	 * @param array<string> $meta_keys 要包含的 meta 欄位
 	 */
 	public static function instance(
 		\WC_Product $product,
@@ -77,7 +77,7 @@ final class Product extends DTO {
 	 * 轉換為陣列
 	 *
 	 * @param array<string>|null $partials 要包含的 partial，可以輸入 'basic', 'detail', 'price', 'stock', 'sales', 'size', 'subscription', 'taxonomy', 'attribute', 'variation'
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public function to_array( $partials = null ): array {
 		$partials = $partials ? $partials : [

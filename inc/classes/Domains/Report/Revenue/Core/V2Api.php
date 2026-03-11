@@ -79,18 +79,6 @@ final class V2Api extends ApiBase {
 
 		$filtered_data = $this->get_reports_revenue_stats($params);
 
-		// 如果沒有找到數據，返回空響應
-		if (empty($filtered_data)) {
-			return new \WP_REST_Response(
-				[
-					'code'    => 200,
-					'message' => '未找到數據',
-					'data'    => null,
-				],
-				200
-			);
-		}
-
 		return new \WP_REST_Response(
 			$filtered_data,
 			200
@@ -318,23 +306,5 @@ final class V2Api extends ApiBase {
 	 */
 	public function should_use_cache( $should_cache, $cache_key ) {
 		return 'local' !== Plugin::$env;
-	}
-
-
-	/**
-	 * 取得日期SQL格式
-	 *
-	 * @param string $interval 間隔
-	 * @return string
-	 */
-	private function get_date_format( string $interval ): string {
-		return match ($interval) {
-			'day' => 'DATE(meta_value)',
-			'week' => 'DATE_FORMAT(meta_value, "%x-%v")',
-			'month' => 'DATE_FORMAT(meta_value, "%x-%m")',
-			'quarter' => 'CONCAT(YEAR(meta_value), "-", QUARTER(meta_value))',
-			'year' => 'DATE_FORMAT(meta_value, "%x")',
-			default => 'DATE(meta_value)',
-		};
 	}
 }

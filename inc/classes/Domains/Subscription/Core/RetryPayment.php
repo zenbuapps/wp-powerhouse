@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace J7\Powerhouse\Domains\Subscription\Core;
 
 /**
-	* 重新嘗試付款
+ * 重新嘗試付款
  *  */
 final class RetryPayment {
 	use \J7\WpUtils\Traits\SingletonTrait;

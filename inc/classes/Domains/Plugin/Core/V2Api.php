@@ -34,6 +34,8 @@ final class V2Api extends ApiBase {
 	public function get_plugins_callback( $request ) { // phpcs:ignore
 		$all_plugins    = \get_plugins();
 		$active_plugins = \get_option('active_plugins', []);
+		/** @var array<string> $active_plugins */
+		$active_plugins = is_array($active_plugins) ? $active_plugins : [];
 
 		$formatted_plugins = [];
 		foreach ( $all_plugins as $plugin_path => $plugin_data ) {

@@ -8,8 +8,9 @@ use J7\Powerhouse\Shared\Enums\EOperater;
 
 /**
  * 方便比較
+ *
  * @example
-    * $result = (new CompareHelper($post, $post_ids))->is(EOperater::IN)->match();
+ * $result = (new CompareHelper($post, $post_ids))->is(EOperater::IN)->match();
  */
 final class CompareHelper {
 
@@ -17,11 +18,13 @@ final class CompareHelper {
 	private array $match_results = [];
 
 
-	/** Constructor */
+	/** Constructor
+	 *
+	 * @param string|int|float|bool|array<mixed>|null $target 目標物件
+	 * @param string|int|float|bool|array<mixed>|null $compared 比較物件
+	 */
 	public function __construct(
-		/** @var string|int|float|bool|array|null 目標物件 */
 		private readonly string|int|float|bool|array|null $target,
-		/** @var string|int|float|bool|array|null 比較物件 */
 		private readonly string|int|float|bool|array|null $compared,
 	) {
 	}
@@ -45,6 +48,7 @@ final class CompareHelper {
 
 	/**
 	 * 是否符合
+	 *
 	 * @param EOperater $operator 操作
 	 *
 	 * @return bool
@@ -66,13 +70,13 @@ final class CompareHelper {
 				case EOperater::NOT_EQUAL:
 					return $this->target !== $this->compared;
 				case EOperater::IN:
-					return \in_array($this->target, $this->compared, true);
+					return \is_array($this->compared) && \in_array($this->target, $this->compared, true);
 				case EOperater::NOT_IN:
-					return \in_array($this->target, $this->compared, true);
+					return \is_array($this->compared) && !\in_array($this->target, $this->compared, true);
 				case EOperater::CONTAINS:
-					return \str_contains($this->target, $this->compared);
+					return \is_string($this->target) && \is_string($this->compared) && \str_contains($this->target, $this->compared);
 				case EOperater::NOT_CONTAINS:
-					return !\str_contains($this->target, $this->compared);
+					return \is_string($this->target) && \is_string($this->compared) && !\str_contains($this->target, $this->compared);
 			}
 			return false;
 		} catch (\Throwable $th) {

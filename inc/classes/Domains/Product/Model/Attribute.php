@@ -106,7 +106,7 @@ final class Attribute extends DTO {
 		}
 
 		// 如果是 taxonomy，則用 term 來組 id=>name
-		$terms = $attribute->get_terms();
+		$terms = $attribute->get_terms() ?? [];
 		foreach ( $terms as $term ) {
 			// 這邊沒打錯，因為 WC 後台創建是可以創建中文 slug 的，即使 db 是 encoded 的 slug
 			// 但如果直接拿 encoded 後的 slug 會與該屬性既有的 term mapping 不到，相當的神奇

@@ -50,25 +50,7 @@ abstract class CRUD {
 	 * @param array<string, mixed>|null $recursive_args 遞迴參數 預設 null 不遞迴.
 	 * @param array<string>             $meta_keys        要暴露出來的 meta keys.
 	 *
-	 * @return array{
-	 *  id: string,
-	 *  type: string,
-	 *  depth: int,
-	 *  name: string,
-	 *  slug: string,
-	 *  date_created: string,
-	 *  date_modified: string,
-	 *  status: string,
-	 *  menu_order: int,
-	 *  permalink: string,
-	 *  category_ids: string[],
-	 *  tag_ids: string[],
-	 *  images: array<array{id: string, url: string, width: int, height: int, alt: string}>,
-	 *  parent_id: string,
-	 *  children?: array<array{id: string, type: string, depth: int, name: string, slug: string, date_created: string, date_modified: string, status: string, menu_order: int, permalink: string, category_ids: string[], tag_ids: string[], images: array<array{id: string, url: string, width: int, height: int, alt: string}>, parent_id: string}>,
-	 *  description?: string,
-	 *  short_description?: string,
-	 * }
+	 * @return array<string, mixed>
 	 */
 	public static function format_post_details(
 		\WP_Post $post,
@@ -132,7 +114,6 @@ abstract class CRUD {
 			$meta_keys_array
 		);
 
-		// @phpstan-ignore-next-line
 		return $formatted_array;
 	}
 
@@ -151,7 +132,7 @@ abstract class CRUD {
 		}
 
 		// 可以改寫 meta_keys
-		// @phpstan-ignore-next-line
+		/** @var array<string, mixed> */
 		return \apply_filters( 'powerhouse/post/get_meta_keys_array', $meta_keys_array, $post );
 	}
 
@@ -206,14 +187,14 @@ abstract class CRUD {
 	 * Sort posts
 	 * 改變文章順序
 	 *
-	 * @param array{from_tree: array<array{id: string}>, to_tree: array<array{id: string}>} $params Parameters.
+	 * @param array{from_tree: array<array{id: string, menu_order?: int|string, parent_id?: int|string}>, to_tree: array<array{id: string, menu_order?: int|string, parent_id?: int|string}>} $params Parameters.
 	 *
 	 * @return true|\WP_Error
 	 * @throws \Exception 排序失敗
 	 */
 	public static function sort_posts( array $params ): bool|\WP_Error {
-		$from_tree = $params['from_tree'] ?? []; // @phpstan-ignore-line
-		$to_tree   = $params['to_tree'] ?? []; // @phpstan-ignore-line
+		$from_tree = $params['from_tree'];
+		$to_tree   = $params['to_tree'];
 
 		// 使用 wpdb 一次更新
 		global $wpdb;
@@ -238,19 +219,14 @@ abstract class CRUD {
 				foreach ($batch as $item) {
 					$id         = intval($item['id']);
 					$ids[]      = $id;
-					$menu_order = intval($item['menu_order']);
-					$parent_id  = $item['parent_id'];
+					$menu_order = intval($item['menu_order'] ?? 0);
+					$parent_id  = $item['parent_id'] ?? 0;
 
 					// 為每個ID準備menu_order的CASE語句
 					$menu_order_cases[] = $wpdb->prepare('WHEN ID = %d THEN %d', $id, $menu_order);
 
 					// 則準備post_parent的CASE語句
 					$parent_cases[] = $wpdb->prepare('WHEN ID = %d THEN %d', $id, $parent_id);
-				}
-
-				// 如果沒有要處理的ID，則跳過
-				if (!$ids) {
-					continue;
 				}
 
 				// 構建ID列表
@@ -261,12 +237,10 @@ abstract class CRUD {
 				$sql .= implode(' ', $menu_order_cases);
 				$sql .= ' ELSE menu_order END ';
 
-				// 如果有post_parent需要更新，加入post_parent的更新語句
-				if ($parent_cases) {
-					$sql .= ', post_parent = CASE ';
-					$sql .= implode(' ', $parent_cases);
-					$sql .= ' ELSE post_parent END ';
-				}
+				// 加入post_parent的更新語句
+				$sql .= ', post_parent = CASE ';
+				$sql .= implode(' ', $parent_cases);
+				$sql .= ' ELSE post_parent END ';
 
 				// 加入WHERE條件，限制只更新需要的記錄
 				$sql .= " WHERE ID IN ($id_list)";
@@ -425,9 +399,11 @@ abstract class CRUD {
 		}
 
 		$flatten_post_ids = [];
-		foreach ($post_array['children'] as $child) {
+		/** @var array<array<string, mixed>> $children */
+		$children = $post_array['children'];
+		foreach ($children as $child) {
 			$flatten_post_ids[] = (int) $child['id'];
-			if (is_array($child['children'] ?? null)) { // @phpstan-ignore-line
+			if (is_array($child['children'] ?? null)) {
 				$flatten_post_ids = [
 					...$flatten_post_ids,
 					...self::get_flatten_post_ids( (int) $child['id'], $recursive_args ),
@@ -443,7 +419,7 @@ abstract class CRUD {
 	 * 這個 function 會將這些參數分離出來，給後續 function 使用
 	 *
 	 * @param array<string, mixed> $args 參數.
-	 * @return array{args: array<string, mixed>, meta_keys: array<string>, with_description: bool, depth: int, recursive_args: ?array<string, mixed>}
+	 * @return array{args: array<string, mixed>, meta_keys: array<string>, with_description: bool, depth: int, recursive_args: ?array<string, mixed>, partials: mixed}
 	 */
 	public static function handle_args( array $args ): array {
 		$default = [

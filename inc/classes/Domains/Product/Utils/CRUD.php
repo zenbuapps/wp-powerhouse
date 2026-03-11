@@ -52,11 +52,11 @@ abstract class CRUD {
 	 * Format product Select
 	 *
 	 * @param \WC_Product $product Product.
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public static function format_select( $product) { // phpcs:ignore
 
-		if ( ! ( $product instanceof \WC_Product ) ) {
+		if ( ! ( $product instanceof \WC_Product ) ) { // @phpstan-ignore-line
 			return [];
 		}
 		$product_id = $product->get_id();
@@ -92,7 +92,10 @@ abstract class CRUD {
 		if (!$product->is_on_sale()) {
 			\update_post_meta($product->get_id(), '_price', $product->get_regular_price());
 			$product->save();
-			$product = \wc_get_product($product->get_id());
+			$refreshed_product = \wc_get_product($product->get_id());
+			if ($refreshed_product) {
+				$product = $refreshed_product;
+			}
 		}
 
 		return match ($product_type) {

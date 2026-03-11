@@ -18,7 +18,7 @@ use J7\Powerhouse\Shared\Enums\EObjectType;
  */
 final class ReplaceHelper {
 
-	/** @var array|object|null 要替換的物件或陣列，若尚未設定則為 null */
+	/** @var array<mixed>|object|null 要替換的物件或陣列，若尚未設定則為 null */
 	private array|object|null $obj = null;
 
 	/** @var string[] $all_placeholders_with_tag 所有匹配到的 placeholder（包含標籤，例如 "{{user.name}}"） */
@@ -50,7 +50,7 @@ final class ReplaceHelper {
 	 * 傳入物件或陣列以執行替換
 	 *
 	 * @param mixed $obj 要替換的物件或陣列，例如 \WP_User $user 可能型別為 array|object|null
-     * @return self 回傳自身以支援 method chaining
+	 * @return self 回傳自身以支援 method chaining
 	 */
 	public function replace( mixed $obj ): self {
 		if (!\is_array($obj) && !\is_object($obj)) {

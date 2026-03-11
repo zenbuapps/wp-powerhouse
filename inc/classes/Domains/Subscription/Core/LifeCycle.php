@@ -8,9 +8,9 @@ use J7\Powerhouse\Domains\Subscription\Shared\Enums\Action;
 use J7\Powerhouse\Domains\Subscription\Shared\Enums\Status;
 
 /**
-	* 註冊訂閱生命週期
-	* 生命週期列表可以看 Action::get_action_hook()
-	* 生命週期參數固定2個，第一個是訂閱，第二個是參數
+ * 註冊訂閱生命週期
+ * 生命週期列表可以看 Action::get_action_hook()
+ * 生命週期參數固定2個，第一個是訂閱，第二個是參數
  *  */
 final class LifeCycle {
 	use \J7\WpUtils\Traits\SingletonTrait;
@@ -144,9 +144,9 @@ final class LifeCycle {
 	/**
 	 * 訂閱從成功到失敗
 	 *
-	 * @param string           $from_status old status
-	 * @param string           $to_status new status
-	 * @param \WC_Subscription $subscription post
+	 * @param string $from_status old status
+	 * @param string $to_status new status
+	 * @param mixed  $subscription post
 	 * @return void
 	 */
 	public function subscription_failed( $from_status, $to_status, $subscription ): void {
@@ -180,9 +180,9 @@ final class LifeCycle {
 	/**
 	 * 訂閱從失敗到成功
 	 *
-	 * @param string           $from_status old status
-	 * @param string           $to_status new status
-	 * @param \WC_Subscription $subscription post
+	 * @param string $from_status old status
+	 * @param string $to_status new status
+	 * @param mixed  $subscription post
 	 * @return void
 	 */
 	public function subscription_success( $from_status, $to_status, $subscription ): void {

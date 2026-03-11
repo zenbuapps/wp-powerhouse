@@ -106,7 +106,7 @@ final class User extends DTO {
 	 * address_2: string,
 	 * } 用戶 billing 資料 Edit 時才暴露
 	 * */
-	public array $billing = [];
+	public array $billing = []; // @phpstan-ignore-line
 
 	/**
 	 * @var array{
@@ -122,15 +122,9 @@ final class User extends DTO {
 	 * address_2: string,
 	 * } 用戶 shipping 資料 Edit 時才暴露
 	 * */
-	public array $shipping = [];
+	public array $shipping = []; // @phpstan-ignore-line
 
-	/** @var array{
-	 * id: string,
-	 * date_created: string,
-	 * content: string,
-	 * added_by: string,
-	 * user_id: string,
-	 * } 聯絡註記 Edit 時才暴露 */
+	/** @var array<string, mixed> 聯絡註記 Edit 時才暴露 */
 	public array $contact_remarks = [];
 
 	/** @var array<string, mixed> 其他 meta 資料 Edit 時才暴露 */
@@ -147,7 +141,7 @@ final class User extends DTO {
 	public static function instance( int $user_id ) {
 		$user = \get_user_by( 'id', $user_id );
 		if ( !$user ) {
-			return new self( [], false );
+			return new self( [] );
 		}
 
 		$user_registered      = (string) $user->get( 'user_registered' );
@@ -165,7 +159,8 @@ final class User extends DTO {
 		]
 		);
 
-		$customer_data    = $customers_query->get_data();
+		$customer_data = $customers_query->get_data();
+		/** @var object{data: array<int, array<string, mixed>>} $customer_data */
 		$customer_history = $customer_data->data[0] ?? null;
 
 		$user_record = [
@@ -215,8 +210,10 @@ final class User extends DTO {
 
 		$meta_keys_array = [];
 		if ($meta_keys) {
-			$user            = \get_user_by( 'id', $user_id );
-			$meta_keys_array = CRUD::get_meta_keys_array( $user, $meta_keys );
+			$user = \get_user_by( 'id', $user_id );
+			if ($user) {
+				$meta_keys_array = CRUD::get_meta_keys_array( $user, $meta_keys );
+			}
 		}
 
 		if ( 'edit' === $context ) {

@@ -64,7 +64,6 @@ final class V2Api extends ApiBase {
 	 *
 	 * @return \WP_REST_Response
 	 * @throws \Exception 缺少 user_ids, item_ids, expire_date, meta_key
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_limit_grant_users_callback( \WP_REST_Request $request ): \WP_REST_Response {
 
@@ -108,7 +107,6 @@ final class V2Api extends ApiBase {
 	 *
 	 * @return \WP_REST_Response
 	 * @throws \Exception 缺少 user_ids, item_ids, timestamp
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_limit_update_users_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		$body_params = $request->get_body_params();
@@ -148,7 +146,6 @@ final class V2Api extends ApiBase {
 	 *
 	 * @return \WP_REST_Response
 	 * @throws \Exception 缺少 user_ids, item_ids
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_limit_revoke_users_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		$body_params = $request->get_body_params();

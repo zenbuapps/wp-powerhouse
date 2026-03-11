@@ -18,5 +18,6 @@ parameters:
 		- vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
 		- vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
 		- vendor/autoload.php
-		- C:\Users\User\LocalSites\turbo\app\public\wp-content\plugins\elementor\elementor.php
-		- C:\Users\User\LocalSites\turbo\app\public\wp-content\plugins\woocommerce-subscriptions\woocommerce-subscriptions.php
+		- vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php
+		- vendor/arts/elementor-stubs/elementor-stubs.php
+		- vendor/php-stubs/woocommerce-subscriptions-stubs/woocommerce-subscriptions-stubs.php

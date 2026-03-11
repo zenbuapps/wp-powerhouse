@@ -88,7 +88,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 *
 	 * @return \WP_REST_Response
-	 * @phpstan-ignore-next-line
 	 */
 	public function get_users_callback( $request ): \WP_REST_Response {
 		$params = $request->get_query_params();
@@ -99,13 +98,13 @@ final class V2Api extends ApiBase {
 
 		$args = CRUD::prepare_query_args( $params );
 
-		$query = new \WP_User_Query( $args );
+		$query = new \WP_User_Query( $args ); // @phpstan-ignore-line
 
 		$users = $query->get_results();
 
 		$total          = $query->get_total();
-		$posts_per_page = $args['number'];
-		$paged          = $args['paged'];
+		$posts_per_page = (int) $args['number'];
+		$paged          = (int) ( $args['paged'] ?? 1 );
 
 		$total_pages = ceil($total / $posts_per_page);
 
@@ -131,9 +130,8 @@ final class V2Api extends ApiBase {
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 *
-	 * @return \WP_REST_Response|\WP_Error
+	 * @return \WP_REST_Response
 	 * @throws \Exception 當文章不存在時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function get_users_with_id_callback( $request ) { // phpcs:ignore
 		$id = $request['id'] ?? null;
@@ -141,16 +139,17 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('user id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 				);
 		}
 
-		$params    = $request->get_query_params();
-		$params    = WP::sanitize_text_field_deep( $params, false );
+		$params = $request->get_query_params();
+		$params = WP::sanitize_text_field_deep( $params, false );
+		/** @var array<string> $meta_keys */
 		$meta_keys = $params['meta_keys'] ?? [];
 
-		$user_array = User::instance( (int) $id, $meta_keys )->to_array('edit');
+		$user_array = User::instance( (int) $id )->to_array('edit', $meta_keys);
 
 		$response = new \WP_REST_Response( $user_array );
 
@@ -191,11 +190,10 @@ final class V2Api extends ApiBase {
 	 * 批量創建/更新用戶
 	 *
 	 * @param \WP_REST_Request $request Request.
-	 * @return \WP_REST_Response|\WP_Error
+	 * @return \WP_REST_Response
 	 * @throws \Exception 當新增用戶失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
-	public function post_users_callback( $request ): \WP_REST_Response|\WP_Error {
+	public function post_users_callback( $request ): \WP_REST_Response {
 
 		$body_params = $request->get_body_params();
 		$body_params = WP::sanitize_text_field_deep( $body_params, false );
@@ -275,7 +273,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
 	 * @throws \Exception 當更新文章失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_users_with_id_callback( $request ): \WP_REST_Response|\WP_Error {
 		$id = $request['id'] ?? null;
@@ -283,7 +280,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('user id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -315,11 +312,10 @@ final class V2Api extends ApiBase {
 	 * 批量寄送重設密碼信
 	 *
 	 * @param \WP_REST_Request $request Request.
-	 * @return \WP_REST_Response|\WP_Error
+	 * @return \WP_REST_Response
 	 * @throws \Exception 當寄送重設密碼信失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
-	public function post_users_resetpassword_callback( $request ): \WP_REST_Response|\WP_Error {
+	public function post_users_resetpassword_callback( $request ): \WP_REST_Response {
 
 		$body_params = $request->get_json_params();
 
@@ -332,10 +328,7 @@ final class V2Api extends ApiBase {
 
 		if (!$ids ) {
 			throw new \Exception(
-				sprintf(
-				__('ids is required', 'powerhouse'),
-				$ids
-			)
+				__('ids is required', 'powerhouse')
 			);
 		}
 
@@ -370,11 +363,10 @@ final class V2Api extends ApiBase {
 	 * 批量刪除用戶
 	 *
 	 * @param \WP_REST_Request $request Request.
-	 * @return \WP_REST_Response|\WP_Error
+	 * @return \WP_REST_Response
 	 * @throws \Exception 當刪除用戶失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
-	public function delete_users_callback( $request ): \WP_REST_Response|\WP_Error {
+	public function delete_users_callback( $request ): \WP_REST_Response {
 
 		$body_params = $request->get_json_params();
 
@@ -413,7 +405,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當刪除用戶失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function delete_users_with_id_callback( $request ): \WP_REST_Response {
 		$id = $request['id'] ?? null;
@@ -421,7 +412,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('user id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -432,7 +423,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('delete user failed #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 				);
 		}

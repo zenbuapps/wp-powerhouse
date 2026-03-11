@@ -74,7 +74,7 @@ abstract class CRUD {
 				'meta_key' => $meta_key,
 				'meta_value' => $meta_value,
 			] = $other_meta_data_record;
-			\update_metadata_by_mid('user', $umeta_id, $meta_value, $meta_key );
+			\update_metadata_by_mid('user', (int) $umeta_id, $meta_value, $meta_key );
 		}
 		// END other_meta_data 儲存處理
 
@@ -98,7 +98,7 @@ abstract class CRUD {
 		}
 
 		// 可以改寫 meta_keys
-		// @phpstan-ignore-next-line
+		/** @var array<string, mixed> */
 		return \apply_filters( 'powerhouse/user/get_meta_keys_array', $meta_keys_array, $user );
 	}
 
@@ -113,7 +113,7 @@ abstract class CRUD {
 	 * @return array{data: array<string, mixed>, meta_data: array<string, mixed>}
 	 */
 	public static function query_separator( array $args ): array {
-		$args['number'] = $args['posts_per_page'] ?? 20; // @phpstan-ignore-line
+		$args['number'] = $args['posts_per_page'] ?? 20;
 		unset( $args['posts_per_page'] );
 
 		$default_args = [
@@ -193,7 +193,9 @@ abstract class CRUD {
 				];
 			}
 
-			$builder = new MetaQueryBuilder( $data['meta_query'] );
+			/** @var array<string, mixed> $meta_query_array */
+			$meta_query_array = $data['meta_query'];
+			$builder          = new MetaQueryBuilder( $meta_query_array );
 			/** @var MetaQueryBuilder $builder */
 			$builder = \apply_filters( 'powerhouse/user/prepare_query_args/meta_query_builder', $builder );
 
@@ -210,15 +212,7 @@ abstract class CRUD {
 	 *
 	 * @param int $user_id 用戶 ID
 	 *
-	 * @return array{
-	 *   product_id: int,
-	 *   product_name: string,
-	 *   quantity: int,
-	 *   price: string|float,
-	 *   variation_id: int,
-	 *   variation: array<string, string>,
-	 *   line_total: float
-	 * }[] 購物車內容陣列，如果購物車為空或發生錯誤則返回空陣列
+	 * @return array<int, array<string, mixed>> 購物車內容陣列，如果購物車為空或發生錯誤則返回空陣列
 	 */
 	public static function get_user_cart_items( int $user_id ): array {
 
@@ -229,20 +223,23 @@ abstract class CRUD {
 
 		// 取得用戶的購物車會話
 		$session_handler = new \WC_Session_Handler();
-		$session         = $session_handler->get_session($user_id);
+		$session         = $session_handler->get_session( (string) $user_id);
 
-		if (!$session || empty($session['cart'])) {
+		if (!$session || !is_array($session) || empty($session['cart'])) {
 			return [];
 		}
 
 		// 解析購物車資料
-		$cart_items   = \maybe_unserialize($session['cart']);
+		$cart_items   = \maybe_unserialize( (string) $session['cart']);
 		$cart_content = [];
 
-		if (!empty($cart_items)) {
+		if (!empty($cart_items) && is_array($cart_items)) {
 			foreach ($cart_items as $cart_item_key => $values) {
+				if (!is_array($values)) {
+					continue;
+				}
 				// 如果 cart_item 是變體，則使用變體的 product_id
-				$product_id = $values['variation_id'] ?: $values['product_id'];
+				$product_id = !empty($values['variation_id']) ? $values['variation_id'] : $values['product_id'];
 				$product    = \wc_get_product($product_id);
 
 				if (!$product) {
@@ -268,15 +265,10 @@ abstract class CRUD {
 	 *
 	 * @param int                  $user_id 用戶 ID
 	 * @param array<string, mixed> $args 查詢參數
-	 * @return array{
-	 *   order_id: int,
-	 *   order_date: string,
-	 *   order_date_human: string|null,
-	 *   order_total: string|float,
-	 *   order_status: string,
-	 * }[]
+	 * @param int                  $format OBJECT or ARRAY_A
+	 * @return array<int, mixed>
 	 */
-	public static function get_user_orders( int $user_id, array $args = [], $format = OBJECT ): array {
+	public static function get_user_orders( int $user_id, array $args = [], int $format = OBJECT ): array {
 		$default_args = [
 			'customer_id' => $user_id,
 			// 'status' => ['wc-processing', 'wc-on-hold'],
@@ -288,6 +280,7 @@ abstract class CRUD {
 
 		$args = \wp_parse_args( $args, $default_args );
 
+		/** @var \WC_Order[] $orders */
 		$orders = \wc_get_orders( $args );
 
 		if (OBJECT === $format) {
@@ -301,8 +294,11 @@ abstract class CRUD {
 			$order_items = [];
 			foreach ($items as $item) {
 				/** @var \WC_Order_Item_Product $item */
-				$product_id    = $item->get_variation_id() ?: $item->get_product_id();
-				$product       = \wc_get_product( $product_id );
+				$product_id = $item->get_variation_id() ?: $item->get_product_id();
+				$product    = \wc_get_product( $product_id );
+				if (!$product) {
+					continue;
+				}
 				$order_items[] = [
 					'product_id'    => (string) $product_id,
 					'product_name'  => $item->get_name(),
@@ -329,7 +325,7 @@ abstract class CRUD {
 	 * 取得指定用戶 ID 的聯絡註記
 	 *
 	 * @param int $user_id 用戶 ID
-	 * @return array<string, mixed>
+	 * @return array<int, array<string, mixed>>
 	 */
 	public static function get_contact_remarks( int $user_id ): array {
 
@@ -338,18 +334,22 @@ abstract class CRUD {
 			return [];
 		}
 
-		$args = [
+		$comment_args = [
 			'type'       => 'contact_remark',
-			'status'     => 'approve', // 'hold' (`comment_status=0`), 'approve' (`comment_status=1`), 'all', or a custom comment status
+			'status'     => 'approve',
 			'fields'     => 'ids',
 			'meta_key'   => 'commented_user_id',
-			'meta_value' => $user_id,
+			'meta_value' => (string) $user_id,
 		];
 
-		$comment_ids = \get_comments( $args );
+		/** @var array<int> $comment_ids */
+		$comment_ids = \get_comments( $comment_args );
 		$comments    = [];
 		foreach ($comment_ids as $comment_id) {
-			$comments[] = Comment::instance( $comment_id )->to_array();
+			$comment = Comment::instance( (int) $comment_id );
+			if ($comment) {
+				$comments[] = $comment->to_array();
+			}
 		}
 		return $comments;
 	}

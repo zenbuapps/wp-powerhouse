@@ -50,11 +50,17 @@ abstract class ExportCSV {
 
 			Base::batch_process(
 				$this->rows,
-				function ( $row ) use ( &$output ) {
+				function ( $row ) use ( $output ) {
+					/** @var array<int|string, bool|float|int|string|null> $fields */
+					$fields = array_map(
+						fn ( $value ) => is_scalar($value) || is_null($value) ? $value : (string) $value,
+						$this->get_field_value($row)
+					);
 					fputcsv(
 						$output,
-						self::get_field_value($row)
+						$fields
 					);
+					return true;
 				}
 			);
 
@@ -70,7 +76,7 @@ abstract class ExportCSV {
 	 * 否則使用 row 的值
 	 *
 	 * @param object $row 文章
-	 * @return array 欄位值
+	 * @return array<mixed> 欄位值
 	 */
 	protected function get_field_value( $row ): array {
 		$values = [];

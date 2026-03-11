@@ -14,14 +14,14 @@ use J7\Powerhouse\Settings\Model\Settings;
 final class Login extends Base {
 	use \J7\WpUtils\Traits\SingletonTrait;
 
-	/** @var login|register 驗證碼容器 class 用來區分是 login 還是 register */
-	protected $container_class = 'login';
+	/** @var string 驗證碼容器 class 用來區分是 login 還是 register */
+	protected string $container_class = 'login';
 
 	/** Constructor */
 	public function __construct() {
 		$settings = Settings::instance();
 
-		$request_url = $_SERVER['REQUEST_URI'] ?? ''; // phpcs:ignore
+		$request_url = (string) ( $_SERVER['REQUEST_URI'] ?? '' ); // phpcs:ignore
 		if (\str_contains($request_url, 'power-partner-server/identity')) {
 			return;
 		}
@@ -50,7 +50,7 @@ final class Login extends Base {
 	 */
 	public function authenticate( null|\WP_User|\WP_Error $user, string $username, string $password ) {
 		// 如果是來自結帳頁面，則跳過驗證碼檢查
-		if ('checkout' === \str_replace('/', '', $_SERVER['REQUEST_URI'] ?? '')) { // phpcs:ignore
+		if ('checkout' === \str_replace('/', '', (string) ( $_SERVER['REQUEST_URI'] ?? '' ))) { // phpcs:ignore
 			return $user;
 		}
 
@@ -62,7 +62,7 @@ final class Login extends Base {
 			return $user;
 		}
 
-		$user_input = $_POST[ $this->captcha_name ] ?? ''; // phpcs:ignore
+		$user_input = (string) ( $_POST[ $this->captcha_name ] ?? '' ); // phpcs:ignore
 		if (!$this->test_phrase($user_input)) {
 			return new \WP_Error('captcha_failed', '驗證碼錯誤');
 		}
@@ -73,8 +73,8 @@ final class Login extends Base {
 	/** AJAX 檢查要登入的用戶是否需要驗證碼 */
 	public function need_captcha(): void {
 
-		$username = $_POST['username'] ?? ''; // phpcs:ignore
-		$pathname = $_POST['pathname'] ?? ''; // phpcs:ignore
+		$username = (string) ( $_POST['username'] ?? '' ); // phpcs:ignore
+		$pathname = (string) ( $_POST['pathname'] ?? '' ); // phpcs:ignore
 
 		if (\str_contains($pathname, 'checkout')) {
 			// 如果是來自結帳頁面，則跳過驗證碼檢查

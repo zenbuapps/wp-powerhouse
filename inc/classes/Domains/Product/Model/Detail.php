@@ -49,8 +49,9 @@ final class Detail extends DTO {
 			require_once ABSPATH . 'wp-admin/includes/theme.php';
 		}
 
+		$post = \get_post($product_id);
 		/** @var array<string, string> $page_templates Label => Value */
-		$page_templates = \get_page_templates($product_id, 'product');
+		$page_templates = \get_page_templates($post instanceof \WP_Post ? $post : null, 'product');
 
 		foreach ( $page_templates as $label => $value ) {
 			$page_template_options[] = [

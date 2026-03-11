@@ -35,7 +35,6 @@ final class LC extends ApiBase {
 	 *
 	 * @param \WP_REST_Request $request 包含新增用戶所需資料的REST請求對象。
 	 * @return \WP_REST_Response 返回包含操作結果的REST響應對象。成功時返回用戶資料，失敗時返回錯誤訊息。
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_lc_invalidate_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		return LC_V2_Api::instance()->post_lc_invalidate_callback( $request );

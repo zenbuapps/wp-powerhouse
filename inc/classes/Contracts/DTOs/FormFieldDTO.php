@@ -9,12 +9,12 @@ use J7\WpUtils\Classes\DTO;
 /** 用來描述表單欄位 */
 class FormFieldDTO extends DTO {
 
-    /** @var string 表單種類 */
+	/** @var string 表單種類 */
 	public string $element;
 
-    /** @var array 元素 attribute */
+	/** @var array<string, mixed> 元素 attribute */
 	public array $attributes = [];
 
-    /** @var array 選項 */
+	/** @var array<string, mixed> 選項 */
 	public array $options = [];
 }

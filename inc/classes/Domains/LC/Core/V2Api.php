@@ -54,7 +54,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request REST請求對象。
 	 * @return \WP_REST_Response 返回包含選項資料的REST響應對象。
 	 * @throws \Exception 如果啟用失敗，則拋出例外。
-	 * @phpstan-ignore-next-line
 	 */
 	public function get_lc_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		return new \WP_REST_Response(Base::get_lc_array());
@@ -67,7 +66,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request REST請求對象。
 	 * @return \WP_REST_Response 返回包含選項資料的REST響應對象。
 	 * @throws \Exception 如果啟用失敗，則拋出例外。
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_lc_activate_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		$body_params = $request->get_json_params();
@@ -105,7 +103,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request REST請求對象。
 	 * @return \WP_REST_Response 返回包含選項資料的REST響應對象。
 	 * @throws \Exception 如果棄用失敗，則拋出例外。
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_lc_deactivate_callback( \WP_REST_Request $request ): \WP_REST_Response {
 
@@ -142,7 +139,6 @@ final class V2Api extends ApiBase {
 	 *
 	 * @param \WP_REST_Request $request 包含新增用戶所需資料的REST請求對象。
 	 * @return \WP_REST_Response 返回包含操作結果的REST響應對象。成功時返回用戶資料，失敗時返回錯誤訊息。
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_lc_invalidate_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		$body_params  = $request->get_json_params();

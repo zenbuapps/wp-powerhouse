@@ -65,31 +65,31 @@ final class V2Api extends ApiBase {
 	];
 
 
-	/**TODO
-	 * Get comments callback
+	/**
+	 * TODO Get comments callback
 	 * 通用的評論查詢
 	 *
 	 * @param \WP_REST_Request $request Request.
-	 *
 	 * @return \WP_REST_Response
-	 * @phpstan-ignore-next-line
 	 */
-	public function get_comments_callback( $request ): \WP_REST_Response {
+	public function get_comments_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		$params = $request->get_query_params();
 		$params = WP::sanitize_text_field_deep( $params, false );
 		/** @var array<string> $meta_keys 要暴露的 meta keys */
 		$meta_keys = $params['meta_keys'] ?? [];
 		unset($params['meta_keys']);
 
+		/** @var array<string, mixed> $params */
 		$args = CRUD::prepare_query_args( $params );
 
-		$query = new \WP_User_Query( $args );
+		/** @var array<string, mixed> $args */
+		$query = new \WP_User_Query( $args ); // @phpstan-ignore argument.type
 
 		$users = $query->get_results();
 
 		$total          = $query->get_total();
-		$posts_per_page = $args['number'];
-		$paged          = $args['paged'];
+		$posts_per_page = isset($args['number']) ? (int) $args['number'] : 10;
+		$paged          = isset($args['paged']) ? (int) $args['paged'] : 1;
 
 		$total_pages = ceil($total / $posts_per_page);
 
@@ -134,7 +134,7 @@ final class V2Api extends ApiBase {
 		$params    = WP::sanitize_text_field_deep( $params, false );
 		$meta_keys = $params['meta_keys'] ?? [];
 
-		$user_array = User::instance( (int) $id, $meta_keys )->to_array('edit');
+		$user_array = User::instance( (int) $id )->to_array('edit');
 
 		$response = new \WP_REST_Response( $user_array );
 
@@ -157,9 +157,9 @@ final class V2Api extends ApiBase {
 		$args = [
 			'comment_author'       => $user->display_name,
 			'comment_author_email' => $user->user_email,
-			'comment_author_IP'    => General::get_client_ip(),
-			'comment_content'      => $body_params['note'] ?? '',
-			'comment_type'         => $body_params['comment_type'] ?? 'comment',
+			'comment_author_IP'    => General::get_client_ip() ?? '',
+			'comment_content'      => (string) ( $body_params['note'] ?? '' ),
+			'comment_type'         => (string) ( $body_params['comment_type'] ?? 'comment' ),
 			'user_id'              => $user->ID,
 			'comment_meta'         => [],
 		];
@@ -195,7 +195,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
 	 * @throws \Exception 當更新文章失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_comments_with_id_callback( $request ): \WP_REST_Response|\WP_Error {
 		$id = $request['id'] ?? null;
@@ -203,7 +202,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('user id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -279,7 +278,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當刪除用戶失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function delete_comments_with_id_callback( $request ): \WP_REST_Response {
 		$id = $request['id'] ?? null;
@@ -287,7 +285,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('comment id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}

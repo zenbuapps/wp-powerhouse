@@ -7,13 +7,16 @@ use J7\Powerhouse\Domains\Post\Utils\CRUD as PostCRUD;
 
 $search = (string) ($_GET['search'] ?? ''); // phpcs:ignore
 
-/** @var array{class: string|null} $args */
+/** @var array{class: string|null, input_class: string|null} $args */
 @[
 	'class' => $class,
 	'input_class' => $input_class,
 ] = $args;
 
 global $post;
+if ( ! ( $post instanceof \WP_Post ) ) {
+	return;
+}
 $top_parent_id = PostCRUD::get_top_post_id( $post->ID );
 
 printf(

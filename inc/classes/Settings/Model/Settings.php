@@ -68,10 +68,10 @@ class Settings extends BaseDTO {
 
 	// ----- ▼ 實驗性功能 ----- //
 
-	/** @var array $api_booster_rules API 加速器規則 */
+	/** @var array<string, mixed> $api_booster_rules API 加速器規則 */
 	public array $api_booster_rules = [];
 
-	/** @var array $api_booster_rule_recipes API 加速器模板 */
+	/** @var array<string, mixed> $api_booster_rule_recipes API 加速器模板 */
 	public array $api_booster_rule_recipes = [];
 
 	// ----- ▼ BunnyCDN 相關 ----- //

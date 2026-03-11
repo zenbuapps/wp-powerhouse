@@ -31,7 +31,6 @@ final class V2Api extends ApiBase {
 	 *
 	 * @param \WP_REST_Request $request REST請求對象。
 	 * @return \WP_REST_Response 返回包含選項資料的REST響應對象。
-	 * @phpstan-ignore-next-line
 	 */
 	public function get_woocommerce_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		if ( ! function_exists( '\WC' ) ) {

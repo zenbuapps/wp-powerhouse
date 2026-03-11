@@ -67,7 +67,7 @@ final class Plugin {
 	 * @param bool   $output 是否輸出
 	 * @param bool   $load_once 是否只載入一次
 	 *
-	 * @return ?string
+	 * @return string|false|null
 	 * @throws \Exception 如果模板文件不存在.
 	 */
 	public static function load_template(
@@ -117,24 +117,27 @@ final class Plugin {
 		$template_path = self::$dir . self::$template_path . "/templates/{$folder}/{$name}";
 
 		// 檢查模板文件是否存在
+		$load_once_bool = (bool) $load_once;
+		$args_array     = is_array($args) ? $args : [];
+
 		if ( file_exists( "{$template_path}.php" ) ) {
 			if ( $echo ) {
-				\load_template( "{$template_path}.php", $load_once, $args );
+				\load_template( "{$template_path}.php", $load_once_bool, $args_array );
 
 				return null;
 			}
 			ob_start();
-			\load_template( "{$template_path}.php", $load_once, $args );
+			\load_template( "{$template_path}.php", $load_once_bool, $args_array );
 
 			return ob_get_clean();
 		} elseif ( file_exists( "{$template_path}/index.php" ) ) {
 			if ( $echo ) {
-				\load_template( "{$template_path}/index.php", $load_once, $args );
+				\load_template( "{$template_path}/index.php", $load_once_bool, $args_array );
 
 				return null;
 			}
 			ob_start();
-			\load_template( "{$template_path}/index.php", $load_once, $args );
+			\load_template( "{$template_path}/index.php", $load_once_bool, $args_array );
 
 			return ob_get_clean();
 		}

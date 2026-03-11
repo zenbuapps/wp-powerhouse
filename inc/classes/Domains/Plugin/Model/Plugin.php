@@ -69,7 +69,7 @@ final class Plugin extends DTO {
 	/**
 	 * 取得實例
 	 *
-	 * @param array $plugin_data 插件資料
+	 * @param array<string, mixed> $plugin_data 插件資料
 	 */
 	public static function instance( array $plugin_data ): self {
 		$args = [

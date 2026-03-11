@@ -57,9 +57,12 @@ abstract class Subscription {
 			'_subscription_trial_period' => $subscription_trial_period,
 		] = self::get_subscription_meta_data( $product );
 
+		$valid_periods = [ 'day', 'week', 'month', 'year' ];
+
 		// 持續 4 個月文字
-		if ($subscription_length) {
-			$subscription_period_label = ( new PeriodLabel( (string) $subscription_period ) )->period_label;
+		if ($subscription_length && \in_array($subscription_period, $valid_periods, true)) {
+			/** @var 'day'|'week'|'month'|'year' $subscription_period */
+			$subscription_period_label = ( new PeriodLabel( $subscription_period ) )->period_label;
 			$product_meta_data[]       = "扣款持續 {$subscription_length}{$subscription_period_label}";
 		}
 
@@ -68,8 +71,9 @@ abstract class Subscription {
 			$product_meta_data[] = "首次開通 {$price}";
 		}
 
-		if ($subscription_trial_length) {
-			$subscription_trial_period_label = ( new PeriodLabel( (string) $subscription_trial_period ) )->period_label;
+		if ($subscription_trial_length && \in_array($subscription_trial_period, $valid_periods, true)) {
+			/** @var 'day'|'week'|'month'|'year' $subscription_trial_period */
+			$subscription_trial_period_label = ( new PeriodLabel( $subscription_trial_period ) )->period_label;
 			$product_meta_data[]             = "包含 {$subscription_trial_length}{$subscription_trial_period_label} 免費試用";
 		}
 
@@ -94,8 +98,14 @@ abstract class Subscription {
 			'_subscription_period_interval' => $subscription_period_interval,
 		] = self::get_subscription_meta_data( $product );
 
+		$valid_periods = [ 'day', 'week', 'month', 'year' ];
+		if (!\in_array($subscription_period, $valid_periods, true)) {
+			return $price;
+		}
+
+		/** @var 'day'|'week'|'month'|'year' $subscription_period */
 		// 組合成  /月 /2月 的文字
-		$period_label = ( new PeriodLabel( (string) $subscription_period, (int) $subscription_period_interval ) )->get_label('/');
+		$period_label = ( new PeriodLabel( $subscription_period, (int) $subscription_period_interval ) )->get_label('/');
 		$period_label = sprintf( /*html*/'<span class="text-sm">%1$s</span>', $period_label);
 
 		// 同 WC_Product_Simple::get_price_html()

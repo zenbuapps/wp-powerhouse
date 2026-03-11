@@ -27,9 +27,9 @@ final class MetaQueryClause extends DTO {
 	 * @return self
 	 */
 	public function set( array $arr ): self {
-		$this->key     = $arr['key'] ?? $this->key;
+		$this->key     = isset($arr['key']) ? (string) $arr['key'] : $this->key;
 		$this->value   = $arr['value'] ?? $this->value;
-		$this->compare = $arr['compare'] ?? $this->compare;
+		$this->compare = isset($arr['compare']) ? (string) $arr['compare'] : $this->compare;
 		return $this;
 	}
 
@@ -41,7 +41,7 @@ final class MetaQueryClause extends DTO {
 	 */
 	public function format_value( string $value ): self {
 		$arr         = explode('{value}', $value);
-		$this->value = $arr[0] . $this->value . ( $arr[1] ?? '' );
+		$this->value = $arr[0] . (string) $this->value . ( $arr[1] ?? '' );
 		return $this;
 	}
 

@@ -74,7 +74,6 @@ final class V2Api extends ApiBase {
 	 * @param  \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 不允許的 MIME 類型 | 找不到檔案
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_upload_callback( $request ): \WP_REST_Response {
 		// get data from form-data
@@ -122,7 +121,7 @@ final class V2Api extends ApiBase {
 	 * @param array{name:string,type:string,tmp_name:string,error:int,size:int} $file 檔案資訊
 	 * @param string|null                                                       $upload_only 是否只上傳，不新增到媒體庫 '0' or '1'
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 * @throws \Exception 不允許的 MIME 類型
 	 */
 	private function handle_single_upload( array $file, ?string $upload_only = '0' ): array {
@@ -162,7 +161,7 @@ final class V2Api extends ApiBase {
 	 * @param array{name:string,type:string,tmp_name:string,error:int,size:int} $file 檔案資訊
 	 * @param string|null                                                       $upload_only 是否只上傳，不新增到媒體庫 '0' or '1'
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 * @throws \Exception 取得圖片尺寸失敗 | 上傳失敗
 	 */
 	private function handle_single_upload_image( array $file, ?string $upload_only = '0' ): array {
@@ -225,7 +224,7 @@ final class V2Api extends ApiBase {
 	 * @param array{name:string,type:string,tmp_name:string,error:int,size:int} $file 檔案資訊
 	 * @param string|null                                                       $upload_only 是否只上傳，不新增到媒體庫 '0' or '1'
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 * @throws \Exception 上傳失敗 | 不允許的 MIME 類型
 	 */
 	private function handle_single_upload_other( array $file, ?string $upload_only = '0' ): array {
@@ -276,7 +275,7 @@ final class V2Api extends ApiBase {
 	 * @param array{name:string[],type:string[],tmp_name:string[],error:int[],size:int[]} $files 檔案資訊
 	 * @param string|null                                                                 $upload_only 是否只上傳，不新增到媒體庫 '0' or '1'
 	 *
-	 * @return array
+	 * @return array<int, array<string, mixed>>
 	 * @throws \Exception 不允許的 MIME 類型 | 上傳失敗
 	 */
 	private function handle_multiple_upload( array $files, ?string $upload_only = '0' ): array {

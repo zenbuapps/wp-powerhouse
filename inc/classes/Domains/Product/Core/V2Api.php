@@ -36,7 +36,7 @@ final class V2Api extends ApiBase {
 	/**
 	 * APIs
 	 *
-	 * @var array{endpoint:string,method:string,permission_callback: ?callable }[]
+	 * @var array{endpoint:string,method:string,permission_callback?: ?callable, callback?: ?callable }[]
 	 */
 	protected $apis = [
 		[
@@ -149,11 +149,11 @@ final class V2Api extends ApiBase {
 		// 將 '[]' 轉為 [], 'true' 轉為 true, 'false' 轉為 false
 		$args = General::parse( $args );
 
-		[
-			'args' => $args,
-			'meta_keys' => $meta_keys,
-			'partials' => $partials,
-		] = PostCRUD::handle_args($args);
+		$handled   = PostCRUD::handle_args($args);
+		$args      = $handled['args'];
+		$meta_keys = $handled['meta_keys'];
+		/** @var array<string>|null $partials */
+		$partials = $handled['partials'] ?? null;
 
 		if (isset($args['fields'])) {
 			unset($args['fields']);// 確保只返回 \WC_Product
@@ -191,7 +191,7 @@ final class V2Api extends ApiBase {
 	 */
 	public function get_products_select_callback( $request ) { // phpcs:ignore
 
-		$params = $request->get_query_params() ?? [];
+		$params = $request->get_query_params();
 
 		$params = WP::sanitize_text_field_deep( $params, false );
 
@@ -244,8 +244,8 @@ final class V2Api extends ApiBase {
 		$response = new \WP_REST_Response( $formatted_products );
 
 		// set pagination in header
-		$response->header( 'X-WP-Total', $total );
-		$response->header( 'X-WP-TotalPages', $total_pages );
+		$response->header( 'X-WP-Total', (string) $total );
+		$response->header( 'X-WP-TotalPages', (string) $total_pages );
 
 		return $response;
 	}
@@ -274,17 +274,17 @@ final class V2Api extends ApiBase {
 		// 將 '[]' 轉為 [], 'true' 轉為 true, 'false' 轉為 false
 		$params = General::parse( $params );
 
-		[
-				'meta_keys' => $meta_keys,
-				'partials' => $partials,
-			] = PostCRUD::handle_args($params);
+		$handled   = PostCRUD::handle_args($params);
+		$meta_keys = $handled['meta_keys'];
+		/** @var array<string>|null $partials */
+		$partials = $handled['partials'] ?? null;
 
 		$product = \wc_get_product( (int) $id );
 		if (!$product) {
 			throw new \Exception(
 				sprintf(
 				__('product not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 				)
 				);
 		}
@@ -306,7 +306,6 @@ final class V2Api extends ApiBase {
 	 * @param bool             $require_id 是否需要 id
 	 * @throws \Exception 當找不到商品時拋出異常。.
 	 * @return array{product: \WC_Product|null, data: array<string, mixed>, meta_data: array<string, mixed>} 包含產品對象、資料和元數據的陣列。
-	 * @phpstan-ignore-next-line
 	 */
 	private function separator( $request, $require_id = true ): array {
 		$product = null; // 初始值，下面會判斷是否需要 id 塞入 product
@@ -316,7 +315,7 @@ final class V2Api extends ApiBase {
 				throw new \Exception(
 				sprintf(
 				__('product id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 				)
 				);
 			}
@@ -326,7 +325,7 @@ final class V2Api extends ApiBase {
 				throw new \Exception(
 				sprintf(
 				__('product not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 				)
 				);
 			}
@@ -364,15 +363,14 @@ final class V2Api extends ApiBase {
 	 * 批量創建 或 批量更新 商品 (用 action 來區分，有帶 action update-many 就是批量更新)
 	 *
 	 * @param \WP_REST_Request $request Request.
-	 * @return \WP_REST_Response
+	 * @return \WP_REST_Response|\WP_Error
 	 * @throws \Exception 當新增商品失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
-	public function post_products_callback( $request ): \WP_REST_Response {
+	public function post_products_callback( $request ): \WP_REST_Response|\WP_Error {
 
 		$body_params = $request->get_body_params();
 
-		if (@$body_params['action'] === 'update-many') {
+		if (( $body_params['action'] ?? '' ) === 'update-many') {
 			return $this->update_many( $request );
 		}
 
@@ -386,7 +384,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當新增商品失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	private function create_many( $request ): \WP_REST_Response {
 		[
@@ -503,7 +500,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('product id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -513,7 +510,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('product not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -522,24 +519,21 @@ final class V2Api extends ApiBase {
 		// TODO 待確認 因為會把 中文的 url encode 過濾掉，就不 sanitize 了
 		$body_params = WP::sanitize_text_field_deep( $body_params, false );
 
+		/** @var array<array<string, mixed>> $new_attributes */
 		$new_attributes = $body_params['new_attributes'] ?? [];
-		/** @var array<array{id: int|null, name: string, options: array<string>, position: int, visible: bool, variation: bool}> $items */
-		$new_attributes = is_array($new_attributes) ? $new_attributes : [];
 
 		$attributes = [];
 
 		foreach ($new_attributes as $index => $new_attribute) {
 
-			@[
-			'id' => $attribute_id,
-			'name' => $name,
-			'options' => $options,
-			'taxonomy' => $taxonomy,
-			'is_taxonomy' => $is_taxonomy, // 創建為全局屬性
-			'position' => $position,
-			'visible' => $visible,
-			'variation' => $variation,
-			] = $new_attribute;
+			$attribute_id = $new_attribute['id'] ?? null;
+			$name         = (string) ( $new_attribute['name'] ?? '' );
+			$options      = is_array($new_attribute['options'] ?? null) ? $new_attribute['options'] : [];
+			$taxonomy     = (string) ( $new_attribute['taxonomy'] ?? '' );
+			$is_taxonomy  = (string) ( $new_attribute['is_taxonomy'] ?? '' ); // 創建為全局屬性
+			$position     = $new_attribute['position'] ?? 0;
+			$visible      = (string) ( $new_attribute['visible'] ?? '' );
+			$variation    = (string) ( $new_attribute['variation'] ?? '' );
 
 			// ----- ▼ 如果是創建新的全局屬性，則需要先創建屬性，再將屬性 id 塞入 $attribute_id ----- //
 			if (\wc_string_to_bool($is_taxonomy)) {
@@ -559,7 +553,7 @@ final class V2Api extends ApiBase {
 				$taxonomy     = "pa_{$taxonomy}"; // 複寫掉 taxonomy，如果不是 pa_ 開頭，會無法加入到商品屬性
 				// 手動添加terms
 				foreach ($options as $option) {
-					$insert_term = \wp_insert_term($option, $taxonomy);
+					$insert_term = \wp_insert_term( (string) $option, $taxonomy);
 					if (\is_wp_error($insert_term)) {
 						throw new \Exception($insert_term->get_error_message());
 					}
@@ -568,12 +562,12 @@ final class V2Api extends ApiBase {
 
 			$attribute = new \WC_Product_Attribute();
 			if ($attribute_id) {
-				$attribute->set_id($attribute_id);
+				$attribute->set_id( (int) $attribute_id);
 			}
-			$attribute->set_name(( $taxonomy ?: $name )); // 如果 taxonomy 有值，則使用 taxonomy，否則使用 name
+			$attribute->set_name( (string) ( $taxonomy ?: $name )); // 如果 taxonomy 有值，則使用 taxonomy，否則使用 name
 
-			$attribute->set_options($options);
-			$attribute->set_position($position);
+			$attribute->set_options( (array) $options);
+			$attribute->set_position( (int) $position);
 			$attribute->set_visible(\wc_string_to_bool($visible));
 			$attribute->set_variation(\wc_string_to_bool($variation));
 			$attributes[] = $attribute;
@@ -610,7 +604,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('product id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -620,7 +614,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('product not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -707,7 +701,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('product id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -717,7 +711,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('product not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -815,7 +809,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當刪除文章失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function delete_products_with_id_callback( $request ): \WP_REST_Response {
 		$id = $request['id'] ?? null;
@@ -823,7 +816,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('product id format not match #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -834,7 +827,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('product not found #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -846,7 +839,7 @@ final class V2Api extends ApiBase {
 			throw new \Exception(
 				sprintf(
 				__('delete product failed #%s', 'powerhouse'),
-				$id
+				(string) $id
 			)
 			);
 		}
@@ -935,7 +928,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當綁定項目失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_products_bind_items_callback( $request ) {
 		$body_params = $request->get_body_params();
@@ -1024,7 +1016,6 @@ final class V2Api extends ApiBase {
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response
 	 * @throws \Exception 當解除綁定失敗時拋出異常
-	 * @phpstan-ignore-next-line
 	 */
 	public function post_products_unbind_items_callback( $request ) {
 

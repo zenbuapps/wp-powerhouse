@@ -114,6 +114,9 @@ final class Scheduler {
 
 		$table_name = "{$wpdb->prefix}actionscheduler_actions";
 
+		/** @var array<mixed> $result */
+		$result = [];
+
 		try {
 
 			$sql_query = "SHOW CREATE TABLE `$table_name`";
@@ -121,7 +124,7 @@ final class Scheduler {
 			// 執行查詢，並取得結果
 			// 該查詢會返回兩欄：'Table' 和 'Create Table'
 			$origin_table_schema_array = $wpdb->get_row( $sql_query, ARRAY_A ); // phpcs:ignore
-			$origin_table_schema       = $origin_table_schema_array['Create Table'];
+			$origin_table_schema       = (string) ( $origin_table_schema_array['Create Table'] ?? '' );
 			if (!$origin_table_schema) {
 				Plugin::logger("modify_action_scheduler_table_schema: 無法取得 {$table_name} 的表結構，請確認 Action Scheduler 是否已安裝並有執行過排程。");
 				return;
@@ -135,7 +138,7 @@ final class Scheduler {
 			// 這是最複雜的一步，因為要確保只保留 CREATE TABLE ... ( ... ) 部分
 
 			// 為了簡化，我們先移除整個表屬性部分 (例如 ENGINE=InnoDB ...)
-			$dbdelta_sql = preg_replace( '/\s(ENGINE|DEFAULT\sCHARACTER\sSET|COLLATE)=[^;]+$/i', '', $dbdelta_sql );
+			$dbdelta_sql = preg_replace( '/\s(ENGINE|DEFAULT\sCHARACTER\sSET|COLLATE)=[^;]+$/i', '', $dbdelta_sql ) ?? '';
 
 			// 確保以分號 (;) 結尾的語句被移除，並準備添加 $wpdb->collate
 			$dbdelta_sql = rtrim( $dbdelta_sql, ';' ) . " $wpdb->collate;";
@@ -155,10 +158,10 @@ final class Scheduler {
 			// 2. 修正留下的 SQL 語法錯誤 (連續逗號)
 			// 將所有「逗號後面跟著任意空白字符，再跟著一個逗號」替換成單個逗號。
 			// 這可以處理 'scheduled_date_gmt(...) ,' 和 ', KEY group_id(...)' 之間的問題。
-			$final_dbdelta_sql = \preg_replace( '/,\s*,/', ',', $final_dbdelta_sql );
+			$final_dbdelta_sql = \preg_replace( '/,\s*,/', ',', $final_dbdelta_sql ) ?? '';
 
 			// 3. (可選但推薦) 移除多餘的空行，使語句更整潔
-			$final_dbdelta_sql = \preg_replace( '/\n\s*\n/', "\n", $final_dbdelta_sql );
+			$final_dbdelta_sql = \preg_replace( '/\n\s*\n/', "\n", $final_dbdelta_sql ) ?? '';
 			$wpdb->query( "DROP INDEX `args` ON `{$table_name}`" );  // phpcs:ignore
 
 			// 4. 執行 dbDelta
@@ -173,7 +176,7 @@ final class Scheduler {
 			$column_type           = self::get_column_type( 'args' );
 			$result['column_type'] = $column_type;
 
-			$is_success = \strpos( $column_type, 'longtext' ) !== false;
+			$is_success = \strpos( $column_type ?? '', 'longtext' ) !== false;
 
 			Plugin::logger(
 			\sprintf(
@@ -206,7 +209,7 @@ final class Scheduler {
 	private static function is_longtext( string $column_name = 'args' ): bool {
 		$column_type           = self::get_column_type( 'args' );
 		$result['column_type'] = $column_type;
-		return \strpos( $column_type, 'longtext' ) !== false;
+		return \strpos( $column_type ?? '', 'longtext' ) !== false;
 	}
 
 	/**

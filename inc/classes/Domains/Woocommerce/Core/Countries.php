@@ -50,8 +50,8 @@ final class Countries {
 	/**
 	 * 擴充台灣縣市
 	 *
-	 * @param array<string,string> $states 縣市陣列
-	 * @return array<string,string> 擴充後的縣市陣列
+	 * @param array<string, array<string,string>|string> $states 縣市陣列
+	 * @return array<string, array<string,string>|string> 擴充後的縣市陣列
 	 */
 	public static function extend_tw_states( array $states ): array {
 		$states['TW'] = self::$states;

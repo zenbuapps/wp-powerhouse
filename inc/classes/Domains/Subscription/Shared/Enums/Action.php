@@ -9,53 +9,57 @@ namespace J7\Powerhouse\Domains\Subscription\Shared\Enums;
  *  */
 enum Action: string {
 
-	/**  @var string 訂閱創建後 */
+	// 訂閱創建後
 	case DATE_CREATED = 'date_created';
 
-	/**
-	 * @var string 訂閱首次付款成功後，
-	 * 如果要設定例如 TRIAL_END 或 NEXT_PAYMENT 前 N 的時間，可以設定在這個時間點
-	 * 個時間點都被寫入 db
-	 * 如果要監聽 訂閱時間點的變化，可以用
-	 * woocommerce_subscription_date_updated hook
-	 * */
+	/*
+	* 訂閱首次付款成功後，
+	* 如果要設定例如 TRIAL_END 或 NEXT_PAYMENT 前 N 的時間，可以設定在這個時間點
+	* 個時間點都被寫入 db
+	* 如果要監聽 訂閱時間點的變化，可以用
+	* woocommerce_subscription_date_updated hook
+	*/
 	case INITIAL_PAYMENT_COMPLETE = 'initial_payment_complete';
 
-	/** @var string 訂閱從成功到失敗 */
+	// 訂閱從成功到失敗
 	case SUBSCRIPTION_FAILED = 'subscription_failed';
 
-	/** @var string 訂閱從失敗到成功 */
+	// 訂閱從失敗到成功
 	case SUBSCRIPTION_SUCCESS = 'subscription_success';
 
-	/** @var string 訂閱付款重試 */
+	// 訂閱付款重試
 	case PAYMENT_RETRY = 'payment_retry';
 
-	/** @var string 試用結束 */
+	// 試用結束
 	case TRIAL_END = 'trial_end';
 
-	/** @var string 監聽訂閱時間點的變化 */
+	// 監聽訂閱時間點的變化
 	case WATCH_TRIAL_END = 'watch_trial_end';
 
-	/** @var string 下次付款 */
+	// 下次付款
 	case NEXT_PAYMENT = 'next_payment';
 
-	/** @var string 監聽訂閱時間點的變化 */
+	// 監聽訂閱時間點的變化
 	case WATCH_NEXT_PAYMENT = 'watch_next_payment';
 
-	/** @var string 新的續訂訂單創建 */
+	// 新的續訂訂單創建
 	case RENEWAL_ORDER_CREATED = 'renewal_order_created';
 
-	/** @var string 訂閱結束 */
+	// 訂閱結束
 	case END = 'end';
 
-	/** @var string 監聽訂閱時間點的變化 */
+	// 監聽訂閱時間點的變化
 	case WATCH_END = 'watch_end';
 
-	/** @var string 訂閱結束，如果訂閱有 "cancelled" 或 "pending-cancel" 狀態，會觸發這個 */
+	// 訂閱結束，如果訂閱有 "cancelled" 或 "pending-cancel" 狀態，會觸發這個
 	case END_OF_PREPAID_TERM = 'end_of_prepaid_term';
 
-	/** @return string 取得 訂閱觸發的時間點的 action hook */
+	/**
+	 * 取得 訂閱觸發的時間點的 action hook
+	 *
+	 * @return non-empty-string
+	 */
 	public function get_action_hook(): string {
-		return "powerhouse_subscription_at_{$this->value}";
+		return 'powerhouse_subscription_at_' . $this->value;
 	}
 }

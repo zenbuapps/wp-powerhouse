@@ -15,7 +15,7 @@ class ProductTypes extends DTO {
 	/** @var array<array{value: string, label: string, color: string}> $product_types */
 	public array $product_types;
 
-	/** @var array<array{value: string, label: string, color: string}> $product_types */
+	/** @var array<string, array{value: string, label: string, color: string}> $product_types_mapper */
 	protected static array $product_types_mapper = [
 		'simple' => [
 			'value' => 'simple',

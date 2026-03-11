@@ -10,7 +10,7 @@ enum EObjectType: string {
 	case Product = 'product';
 	case Order   = 'order';
 	case Post    = 'post';
-	case Object    = 'obj';
+	case Object  = 'obj';
 
 	/**
 	 * 取得 EObjectTypes
@@ -37,9 +37,9 @@ enum EObjectType: string {
 		if ( $obj instanceof \WC_Order) {
 			return self::Order;
 		}
-        if(\is_object( $obj)){
-            return self::Object;
-        }
+		if (\is_object( $obj)) {
+			return self::Object;
+		}
 		throw new \Exception('Unsupported object type');
 	}
 }

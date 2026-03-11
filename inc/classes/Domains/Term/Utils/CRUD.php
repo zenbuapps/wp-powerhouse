@@ -26,11 +26,11 @@ abstract class CRUD {
 			'meta_data' => $meta_data,
 		] = WP::separator($args, 'term');
 
-		$term = $data['name'];
+		$term = (string) ( $data['name'] ?? '' );
 		unset($data['name']);
 
 		/** @var array{term_id: int, term_taxonomy_id: int}|\WP_Error $result */
-		$result = \wp_insert_term($term, $taxonomy, $data);
+		$result = \wp_insert_term($term, $taxonomy, $data); // @phpstan-ignore-line
 
 		if (\is_wp_error($result)) {
 			return $result;
@@ -137,14 +137,14 @@ abstract class CRUD {
 		] = WP::separator($args, 'term');
 
 		/** @var array{term_id: int, term_taxonomy_id: int}|\WP_Error $result */
-		$result = \wp_update_term($term_id, $taxonomy, $data);
+		$result = \wp_update_term( (int) $term_id, $taxonomy, $data); // @phpstan-ignore-line
 
 		if (\is_wp_error($result)) {
 			return $result;
 		}
 
 		foreach ($meta_data as $meta_key => $meta_value) {
-			\update_term_meta($term_id, $meta_key, $meta_value);
+			\update_term_meta( (int) $term_id, $meta_key, $meta_value);
 		}
 
 		return (int) $term_id;
@@ -187,12 +187,17 @@ abstract class CRUD {
 	 * @return array<int>
 	 */
 	public static function get_flatten_term_ids( int $term_id, string $taxonomy ): array {
-		return \get_terms(
+		$result = \get_terms(
 			[
 				'taxonomy' => $taxonomy,
 				'child_of' => $term_id,
 				'fields'   => 'ids',
 			]
 			);
+		if (\is_wp_error($result)) {
+			return [];
+		}
+		/** @var array<int> $result */
+		return $result;
 	}
 }

@@ -25,7 +25,7 @@ abstract class Base {
 	/** @var string 排程的 hook {plugin_name}/{version}/{domains}/{action} */
 	protected static string $hook;
 
-	/** @var array 排程的參數 */
+	/** @var array<string, mixed> 排程的參數 */
 	protected array $args;
 
 	/** Constructor，每次傳入的資源實例可能不同 */
@@ -36,7 +36,11 @@ abstract class Base {
 		$this->args = $this->get_args();
 	}
 
-	/** 取得排程的參數，執行時會傳入 action_callback @return array<string, string> */
+	/**
+	 * 取得排程的參數，執行時會傳入 action_callback
+	 *
+	 * @return array<string, mixed>
+	 */
 	abstract protected function get_args(): array;
 
 	/**
@@ -82,6 +86,54 @@ abstract class Base {
 	}
 
 	/**
+	 * 取消排程後的 hook，子類別可覆寫
+	 *
+	 * @param int    $action_id 排程的 action_id
+	 * @param string $group 排程的群組
+	 * @return void
+	 */
+	protected function after_unschedule( int $action_id, string $group ): void {}
+
+	/**
+	 * 單次排程後的 hook，子類別可覆寫
+	 *
+	 * @param int|null $action_id 排程的 action_id
+	 * @param int      $timestamp 排程的時間
+	 * @param string   $group 排程的群組
+	 * @return void
+	 */
+	protected function after_schedule_single( int|null $action_id, int $timestamp, string $group ): void {}
+
+	/**
+	 * 定期排程後的 hook，子類別可覆寫
+	 *
+	 * @param int|null $action_id 排程的 action_id
+	 * @param int      $timestamp 排程的時間
+	 * @param int      $interval  排程的間隔
+	 * @param string   $group 排程的群組
+	 * @return void
+	 */
+	protected function after_schedule_recurring( int|null $action_id, int $timestamp, int $interval, string $group ): void {}
+
+	/**
+	 * 非同步排程後的 hook，子類別可覆寫
+	 *
+	 * @param int|null $action_id 排程的 action_id
+	 * @param int      $timestamp 排程的時間
+	 * @param string   $group 排程的群組
+	 * @return void
+	 */
+	protected function after_schedule_async( int|null $action_id, int $timestamp, string $group ): void {}
+
+	/**
+	 * 取消所有排程後的 hook，子類別可覆寫
+	 *
+	 * @param string $group 排程的群組
+	 * @return void
+	 */
+	protected function after_unschedule_all( string $group ): void {}
+
+	/**
 	 * 取消排程
 	 *
 	 * @param string $group 排程的群組
@@ -93,12 +145,9 @@ abstract class Base {
 			return null;
 		}
 
-		\ActionScheduler_Store::instance()->delete_action( (int) $action_id);
+		\ActionScheduler_Store::instance()->delete_action( (int) $action_id); // @phpstan-ignore class.notFound
 
-		$method_name = 'after_' . __FUNCTION__;
-		if ( method_exists( static::class, $method_name ) ) {
-			$this->{$method_name}($action_id, $group);
-		}
+		$this->after_unschedule($action_id, $group);
 
 		return $action_id;
 	}
@@ -141,10 +190,7 @@ abstract class Base {
 
 		$action_id = \as_schedule_single_action( $timestamp, static::$hook, [ $this->args ], $group, $unique, $priority ) ?: null;
 
-		$method_name = 'after_' . __FUNCTION__;
-		if ( method_exists( static::class, $method_name ) ) {
-			$this->{$method_name}( $action_id, $timestamp, $group );
-		}
+		$this->after_schedule_single( $action_id, $timestamp, $group );
 
 		return $action_id;
 	}
@@ -162,10 +208,7 @@ abstract class Base {
 
 		$action_id = \as_schedule_recurring_action( $timestamp, $interval, static::$hook, [ $this->args ], $group, $unique, $priority ) ?: null;
 
-		$method_name = 'after_' . __FUNCTION__;
-		if ( method_exists( static::class, $method_name ) ) {
-			$this->{$method_name}( $action_id, $timestamp, $interval, $group );
-		}
+		$this->after_schedule_recurring( $action_id, $timestamp, $interval, $group );
 
 		return $action_id;
 	}
@@ -182,10 +225,7 @@ abstract class Base {
 
 		$action_id = \as_enqueue_async_action( static::$hook, [ $this->args ], $group, $unique, $priority ) ?: null;
 
-		$method_name = 'after_' . __FUNCTION__;
-		if ( method_exists( static::class, $method_name ) ) {
-			$this->{$method_name}( $action_id, $timestamp, $group );
-		}
+		$this->after_schedule_async( $action_id, $timestamp, $group );
 
 		return $action_id;
 	}
@@ -199,9 +239,6 @@ abstract class Base {
 	public function unschedule_all( $group = '' ): void {
 		\as_unschedule_all_actions( static::$hook, [ $this->args ], $group );
 
-		$method_name = 'after_' . __FUNCTION__;
-		if ( method_exists( static::class, $method_name ) ) {
-			$this->{$method_name}($group);
-		}
+		$this->after_unschedule_all($group);
 	}
 }
