@@ -40,7 +40,7 @@ imports:
   - shared/mood.md
   - ../copilot-instructions.md
   # TODO: 請替換為您的專案技能路徑，例如：
-  # - ../skills/{project_name}/SKILL.md
+  # - ../skills/powerhouse/SKILL.md
 ---
 
 # 規劃助理 — 先釐清，再規劃

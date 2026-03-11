@@ -51,7 +51,7 @@ imports:
   - shared/reporting.md
   - ../copilot-instructions.md
   # TODO: 請替換為您的專案技能路徑，例如：
-  # - ../skills/{project_name}/SKILL.md
+  # - ../skills/powerhouse/SKILL.md
 ---
 
 # CI 故障診斷醫生
