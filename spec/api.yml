@@ -1,0 +1,1896 @@
+openapi: 3.0.3
+info:
+  title: Powerhouse REST API
+  description: |
+    Powerhouse 核心基礎外掛的通用 REST API，提供 WordPress 各項資源的 CRUD 操作、授權碼管理、存取權限控制等功能。
+
+    ## 錯誤碼對應規則
+    - **400** = 前置（參數）Rules 驗證失敗
+    - **403** = 前置（狀態）Rules 不符（權限不足）
+    - **404** = 資源找不到
+    - **500** = 伺服器錯誤
+
+    ## 認證
+    所有管理端 API 需要 WordPress 登入 Cookie 加上 `X-WP-Nonce` Header。
+    `lc/invalidate` 端點為公開端點（`__return_true`）。
+  version: "3.3.46"
+
+servers:
+  - url: /wp-json/v2/powerhouse
+    description: V2 Powerhouse API
+
+tags:
+  - name: Post
+    description: 文章 CRUD（通用，支援所有 post_type）
+  - name: User
+    description: 用戶管理
+  - name: Option
+    description: 外掛設定
+  - name: LicenseCode
+    description: 授權碼管理
+  - name: Upload
+    description: 檔案上傳
+  - name: Shortcode
+    description: 短碼執行
+  - name: Plugin
+    description: 外掛列表
+  - name: Comment
+    description: 評論管理
+  - name: Term
+    description: 分類法詞彙管理
+  - name: Product
+    description: WooCommerce 商品管理（需要 WooCommerce）
+  - name: ProductAttribute
+    description: WooCommerce 全局商品屬性（需要 WooCommerce）
+  - name: Order
+    description: WooCommerce 訂單管理（需要 WooCommerce）
+  - name: Copy
+    description: 複製文章/商品（需要 WooCommerce）
+  - name: Limit
+    description: 存取權限管理（需要 WooCommerce）
+  - name: Report
+    description: 營收報表（需要 WooCommerce）
+  - name: Woocommerce
+    description: WooCommerce 全局資訊（需要 WooCommerce）
+
+components:
+  securitySchemes:
+    wpNonce:
+      type: apiKey
+      in: header
+      name: X-WP-Nonce
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        data:
+          oneOf:
+            - type: object
+            - type: array
+              items: {}
+            - type: string
+            - type: integer
+
+    PaginationHeaders:
+      type: object
+      description: 分頁資訊透過 response headers 回傳
+      properties:
+        X-WP-Total:
+          type: string
+        X-WP-TotalPages:
+          type: string
+        X-WP-CurrentPage:
+          type: string
+        X-WP-PageSize:
+          type: string
+
+    PostItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        post_title:
+          type: string
+        post_name:
+          type: string
+        post_type:
+          type: string
+        post_status:
+          type: string
+        post_date:
+          type: string
+        post_parent:
+          type: integer
+        menu_order:
+          type: integer
+        meta:
+          type: object
+          additionalProperties: true
+
+    UserItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_login:
+          type: string
+        user_email:
+          type: string
+        display_name:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+
+    LicenseCodeItem:
+      type: object
+      properties:
+        code:
+          type: string
+        post_status:
+          type: string
+          enum: [activated, available, ""]
+        expire_date:
+          type: string
+        type:
+          type: string
+        product_slug:
+          type: string
+        product_name:
+          type: string
+
+    ProductItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+        regular_price:
+          type: string
+        sale_price:
+          type: string
+        description:
+          type: string
+        short_description:
+          type: string
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+        customer_id:
+          type: integer
+        total:
+          type: string
+
+    TermItem:
+      type: object
+      properties:
+        term_id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        taxonomy:
+          type: string
+        parent:
+          type: integer
+        count:
+          type: integer
+
+    ProductAttributeItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        type:
+          type: string
+        order_by:
+          type: string
+
+    RevenueStats:
+      type: object
+      properties:
+        totals:
+          type: object
+          properties:
+            orders_count:
+              type: integer
+            total_sales:
+              type: number
+            net_revenue:
+              type: number
+            refunds:
+              type: number
+            gross_sales:
+              type: number
+        intervals:
+          type: array
+          items:
+            type: object
+        total:
+          type: integer
+        pages:
+          type: integer
+
+security:
+  - wpNonce: []
+
+paths:
+  # ===== Post =====
+  /posts:
+    get:
+      tags: [Post]
+      summary: 查詢文章列表
+      operationId: GetPosts
+      parameters:
+        - name: post_type
+          in: query
+          schema:
+            type: string
+            default: post
+        - name: posts_per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: paged
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: post_status
+          in: query
+          schema:
+            type: string
+            default: any
+        - name: post_parent
+          in: query
+          schema:
+            type: string
+            default: "0"
+        - name: meta_keys
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        "200":
+          description: 文章列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostItem"
+    post:
+      tags: [Post]
+      summary: 建立文章（批量）
+      operationId: CreatePost
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                post_type:
+                  type: string
+                post_title:
+                  type: string
+                post_content:
+                  type: string
+                post_status:
+                  type: string
+                qty:
+                  type: integer
+                  default: 1
+      responses:
+        "200":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [Post]
+      summary: 批量刪除文章
+      operationId: DeletePosts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /posts/{id}:
+    get:
+      tags: [Post]
+      summary: 查詢單一文章
+      operationId: GetPost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: meta_keys
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        "200":
+          description: 文章詳情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostItem"
+    post:
+      tags: [Post]
+      summary: 更新文章
+      operationId: UpdatePost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                post_title:
+                  type: string
+                post_content:
+                  type: string
+                post_status:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [Post]
+      summary: 刪除單一文章
+      operationId: DeletePost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /posts/{id}/field/{field_name}:
+    get:
+      tags: [Post]
+      summary: 查詢文章單一欄位
+      operationId: GetPostField
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: field_name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 欄位值
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /posts/sort:
+    post:
+      tags: [Post]
+      summary: 文章排序
+      operationId: SortPosts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from_tree:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                to_tree:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+      responses:
+        "200":
+          description: 排序成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== User =====
+  /users:
+    get:
+      tags: [User]
+      summary: 查詢用戶列表
+      operationId: GetUsers
+      parameters:
+        - name: number
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: paged
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: meta_keys
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        "200":
+          description: 用戶列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserItem"
+    post:
+      tags: [User]
+      summary: 建立/批量更新用戶
+      operationId: CreateUser
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                user_login:
+                  type: string
+                user_email:
+                  type: string
+                role:
+                  type: string
+                qty:
+                  type: integer
+                  default: 1
+                ids:
+                  type: array
+                  items:
+                    type: string
+                  description: 若帶 ids 則為批量更新模式
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [User]
+      summary: 批量刪除用戶
+      operationId: DeleteUsers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users/{id}:
+    get:
+      tags: [User]
+      summary: 查詢單一用戶
+      operationId: GetUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: meta_keys
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        "200":
+          description: 用戶詳情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserItem"
+    post:
+      tags: [User]
+      summary: 更新用戶
+      operationId: UpdateUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                role:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [User]
+      summary: 刪除單一用戶
+      operationId: DeleteUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users/options:
+    get:
+      tags: [User]
+      summary: 查詢用戶選項（角色列表）
+      operationId: GetUserOptions
+      responses:
+        "200":
+          description: 角色列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users/resetpassword:
+    post:
+      tags: [User]
+      summary: 批量寄送重設密碼信
+      operationId: ResetPassword
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 寄送成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== Option =====
+  /options:
+    get:
+      tags: [Option]
+      summary: 查詢設定
+      operationId: GetSettings
+      responses:
+        "200":
+          description: 設定資料
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    post:
+      tags: [Option]
+      summary: 更新設定
+      operationId: UpdateSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                powerhouse_settings:
+                  type: object
+                  description: 部分更新的設定鍵值對
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /options/upload:
+    get:
+      tags: [Option]
+      summary: 查詢上傳允許的 MIME 類型
+      operationId: GetUploadOptions
+      deprecated: true
+      responses:
+        "200":
+          description: 允許的 MIME 類型
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== License Code =====
+  /lc:
+    get:
+      tags: [LicenseCode]
+      summary: 查詢授權碼狀態
+      operationId: GetLicenseCodes
+      responses:
+        "200":
+          description: 授權碼狀態列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LicenseCodeItem"
+
+  /lc/activate:
+    post:
+      tags: [LicenseCode]
+      summary: 啟用授權碼
+      operationId: ActivateLicenseCode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, product_slug]
+              properties:
+                code:
+                  type: string
+                product_slug:
+                  type: string
+      responses:
+        "200":
+          description: 啟用成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /lc/deactivate:
+    post:
+      tags: [LicenseCode]
+      summary: 棄用授權碼
+      operationId: DeactivateLicenseCode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, product_slug]
+              properties:
+                code:
+                  type: string
+                product_slug:
+                  type: string
+      responses:
+        "200":
+          description: 棄用成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /lc/invalidate:
+    post:
+      tags: [LicenseCode]
+      summary: 清除授權碼快取
+      operationId: InvalidateLicenseCodeCache
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_slug]
+              properties:
+                product_slug:
+                  type: string
+      responses:
+        "200":
+          description: 清除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== Upload =====
+  /upload:
+    post:
+      tags: [Upload]
+      summary: 上傳檔案
+      operationId: UploadFile
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: string
+                  format: binary
+                upload_only:
+                  type: string
+                  default: "0"
+                  description: "'1' 僅上傳不加入媒體庫"
+      responses:
+        "200":
+          description: 上傳成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /upload/options:
+    get:
+      tags: [Upload]
+      summary: 查詢上傳允許的 MIME 類型
+      operationId: GetUploadMimeOptions
+      responses:
+        "200":
+          description: 允許的 MIME 類型
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allowed_mime_types:
+                    type: object
+
+  # ===== Shortcode =====
+  /shortcode:
+    get:
+      tags: [Shortcode]
+      summary: 執行短碼
+      operationId: GetShortcode
+      parameters:
+        - name: shortcode
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 短碼執行結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== Plugin =====
+  /plugins:
+    get:
+      tags: [Plugin]
+      summary: 查詢外掛列表
+      operationId: GetPlugins
+      responses:
+        "200":
+          description: 外掛列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  # ===== Comment =====
+  /comments:
+    post:
+      tags: [Comment]
+      summary: 建立評論
+      operationId: CreateComment
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+                comment_type:
+                  type: string
+                  default: comment
+                is_customer_note:
+                  type: string
+                commented_user_id:
+                  type: string
+      responses:
+        "200":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /comments/{id}:
+    delete:
+      tags: [Comment]
+      summary: 刪除評論
+      operationId: DeleteComment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== Term =====
+  /terms/{taxonomy}:
+    get:
+      tags: [Term]
+      summary: 查詢詞彙列表
+      operationId: GetTerms
+      parameters:
+        - name: taxonomy
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: posts_per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: paged
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: parent
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: 詞彙列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TermItem"
+    post:
+      tags: [Term]
+      summary: 建立詞彙（批量）
+      operationId: CreateTerm
+      parameters:
+        - name: taxonomy
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                parent:
+                  type: integer
+                qty:
+                  type: integer
+                  default: 1
+      responses:
+        "200":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [Term]
+      summary: 批量刪除詞彙
+      operationId: DeleteTerms
+      parameters:
+        - name: taxonomy
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /terms/{taxonomy}/{id}:
+    get:
+      tags: [Term]
+      summary: 查詢單一詞彙
+      operationId: GetTerm
+      parameters:
+        - name: taxonomy
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 詞彙詳情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TermItem"
+    post:
+      tags: [Term]
+      summary: 更新詞彙
+      operationId: UpdateTerm
+      parameters:
+        - name: taxonomy
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                parent:
+                  type: integer
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [Term]
+      summary: 刪除單一詞彙
+      operationId: DeleteTerm
+      parameters:
+        - name: taxonomy
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /terms/{taxonomy}/sort:
+    post:
+      tags: [Term]
+      summary: 詞彙排序
+      operationId: SortTerms
+      parameters:
+        - name: taxonomy
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from_tree:
+                  type: array
+                  items:
+                    type: object
+                to_tree:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "200":
+          description: 排序成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== Product (requires WooCommerce) =====
+  /products:
+    get:
+      tags: [Product]
+      summary: 查詢商品列表
+      operationId: GetProducts
+      parameters:
+        - name: posts_per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: paged
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 商品列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductItem"
+    post:
+      tags: [Product]
+      summary: 建立/批量更新商品
+      operationId: CreateProduct
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  description: "'update-many' 為批量更新模式"
+                qty:
+                  type: integer
+                  default: 1
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [Product]
+      summary: 批量刪除商品
+      operationId: DeleteProducts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                force_delete:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /products/{id}:
+    get:
+      tags: [Product]
+      summary: 查詢單一商品
+      operationId: GetProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 商品詳情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductItem"
+    post:
+      tags: [Product]
+      summary: 更新商品
+      operationId: UpdateProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [Product]
+      summary: 刪除單一商品
+      operationId: DeleteProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /products/select:
+    get:
+      tags: [Product]
+      summary: 商品選擇器查詢
+      operationId: GetProductsSelect
+      parameters:
+        - name: s
+          in: query
+          schema:
+            type: string
+        - name: post__in
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+      responses:
+        "200":
+          description: 商品精簡列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /products/options:
+    get:
+      tags: [Product]
+      summary: 查詢商品選項
+      operationId: GetProductOptions
+      responses:
+        "200":
+          description: 商品分類/標籤/價格範圍等選項
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /products/attributes/{id}:
+    post:
+      tags: [Product]
+      summary: 更新商品屬性
+      operationId: UpdateProductAttributes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                new_attributes:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /products/create-variations/{id}:
+    post:
+      tags: [Product]
+      summary: 產生變體
+      operationId: CreateProductVariations
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /products/update-variations/{id}:
+    post:
+      tags: [Product]
+      summary: 更新變體
+      operationId: UpdateProductVariations
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                default_attributes:
+                  type: object
+                variations:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /products/bind-items:
+    post:
+      tags: [Product]
+      summary: 綁定權限項目到商品
+      operationId: BindItemsToProduct
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [product_ids, item_ids, limit_type, meta_key]
+              properties:
+                product_ids:
+                  type: array
+                  items:
+                    type: integer
+                item_ids:
+                  type: array
+                  items:
+                    type: integer
+                limit_type:
+                  type: string
+                  enum: [unlimited, fixed, assigned, follow_subscription]
+                limit_value:
+                  type: integer
+                limit_unit:
+                  type: string
+                  enum: [timestamp, day, month, year]
+                meta_key:
+                  type: string
+      responses:
+        "200":
+          description: 綁定成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /products/update-bound-items:
+    post:
+      tags: [Product]
+      summary: 更新綁定權限
+      operationId: UpdateBoundItems
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [product_ids, item_ids, limit_type, meta_key]
+              properties:
+                product_ids:
+                  type: array
+                  items:
+                    type: integer
+                item_ids:
+                  type: array
+                  items:
+                    type: integer
+                limit_type:
+                  type: string
+                limit_value:
+                  type: integer
+                limit_unit:
+                  type: string
+                meta_key:
+                  type: string
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /products/unbind-items:
+    post:
+      tags: [Product]
+      summary: 解除綁定權限項目
+      operationId: UnbindItemsFromProduct
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [product_ids, item_ids, meta_key]
+              properties:
+                product_ids:
+                  type: array
+                  items:
+                    type: integer
+                item_ids:
+                  type: array
+                  items:
+                    type: integer
+                meta_key:
+                  type: string
+      responses:
+        "200":
+          description: 解除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== ProductAttribute =====
+  /product-attributes:
+    get:
+      tags: [ProductAttribute]
+      summary: 查詢商品屬性列表
+      operationId: GetProductAttributes
+      responses:
+        "200":
+          description: 屬性列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductAttributeItem"
+    post:
+      tags: [ProductAttribute]
+      summary: 建立商品屬性
+      operationId: CreateProductAttribute
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                type:
+                  type: string
+                  default: select
+                order_by:
+                  type: string
+                  default: menu_order
+                has_archives:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /product-attributes/{id}:
+    post:
+      tags: [ProductAttribute]
+      summary: 更新商品屬性
+      operationId: UpdateProductAttribute
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [ProductAttribute]
+      summary: 刪除商品屬性
+      operationId: DeleteProductAttribute
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== Order =====
+  /orders:
+    get:
+      tags: [Order]
+      summary: 查詢訂單列表
+      operationId: GetOrders
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+        - name: paged
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: type
+          in: query
+          schema:
+            type: string
+            default: shop_order
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 訂單列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderItem"
+    post:
+      tags: [Order]
+      summary: 建立訂單
+      operationId: CreateOrder
+      responses:
+        "200":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [Order]
+      summary: 批量刪除訂單
+      operationId: DeleteOrders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /orders/{id}:
+    get:
+      tags: [Order]
+      summary: 查詢單一訂單
+      operationId: GetOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 訂單詳情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderItem"
+    post:
+      tags: [Order]
+      summary: 更新訂單
+      operationId: UpdateOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+    delete:
+      tags: [Order]
+      summary: 刪除單一訂單
+      operationId: DeleteOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /orders/options:
+    get:
+      tags: [Order]
+      summary: 查詢訂單選項（狀態列表）
+      operationId: GetOrderOptions
+      responses:
+        "200":
+          description: 訂單狀態列表
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /order-notes:
+    post:
+      tags: [Order]
+      summary: 新增訂單備註
+      operationId: CreateOrderNote
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [order_id, note, is_customer_note]
+              properties:
+                order_id:
+                  type: string
+                note:
+                  type: string
+                is_customer_note:
+                  type: string
+      responses:
+        "200":
+          description: 建立成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /order-notes/{id}:
+    delete:
+      tags: [Order]
+      summary: 刪除訂單備註
+      operationId: DeleteOrderNote
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 刪除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== Copy =====
+  /copy/{id}:
+    post:
+      tags: [Copy]
+      summary: 複製文章/商品
+      operationId: CopyPost
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 複製成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== Limit =====
+  /limit/grant-users:
+    post:
+      tags: [Limit]
+      summary: 授權用戶存取
+      operationId: GrantUserAccess
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [user_ids, item_ids, expire_date]
+              properties:
+                user_ids:
+                  type: array
+                  items:
+                    type: integer
+                item_ids:
+                  type: array
+                  items:
+                    type: integer
+                expire_date:
+                  type: string
+                  description: "10 位 timestamp 或 0（無期限）"
+      responses:
+        "200":
+          description: 授權成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /limit/update-users:
+    post:
+      tags: [Limit]
+      summary: 更新用戶存取期限
+      operationId: UpdateUserAccess
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [user_ids, item_ids, timestamp]
+              properties:
+                user_ids:
+                  type: array
+                  items:
+                    type: integer
+                item_ids:
+                  type: array
+                  items:
+                    type: integer
+                timestamp:
+                  type: integer
+                  description: "到期時間戳記，0 為無期限"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /limit/revoke-users:
+    post:
+      tags: [Limit]
+      summary: 撤銷用戶存取
+      operationId: RevokeUserAccess
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [user_ids, item_ids]
+              properties:
+                user_ids:
+                  type: array
+                  items:
+                    type: integer
+                item_ids:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        "200":
+          description: 撤銷成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ===== Report =====
+  /reports/revenue/stats:
+    get:
+      tags: [Report]
+      summary: 查詢營收統計
+      operationId: GetRevenueStats
+      parameters:
+        - name: before
+          in: query
+          schema:
+            type: string
+        - name: after
+          in: query
+          schema:
+            type: string
+        - name: interval
+          in: query
+          schema:
+            type: string
+            default: day
+            enum: [hour, day, week, month, quarter, year]
+      responses:
+        "200":
+          description: 營收統計資料
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevenueStats"
+
+  # ===== Woocommerce =====
+  /woocommerce:
+    get:
+      tags: [Woocommerce]
+      summary: 查詢 WooCommerce 資訊
+      operationId: GetWoocommerce
+      responses:
+        "200":
+          description: WooCommerce 資料
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
