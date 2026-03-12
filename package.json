@@ -28,26 +28,6 @@
 		"i18n:commit": "pnpm i18n && git add . && git commit --amend --no-edit"
 	},
 	"dependencies": {
-		"antd-toolkit": "workspace:*",
 		"culori": "^4.0.1"
-	},
-	"devDependencies": {
-		"@power/eslint-config": "workspace:*",
-		"@power/tailwind-config": "workspace:*",
-		"@power/typescript-config": "workspace:*"
-	},
-	"dependenciesMeta": {
-		"antd-toolkit": {
-			"injected": true
-		},
-		"@power/eslint-config": {
-			"injected": true
-		},
-		"@power/tailwind-config": {
-			"injected": true
-		},
-		"@power/typescript-config": {
-			"injected": true
-		}
 	}
 }
