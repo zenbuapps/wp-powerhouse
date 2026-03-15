@@ -1,0 +1,19 @@
+[ACTIVITY] 詞彙管理
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 系統 -> {specs/actors/系統.md}
+
+[STEP:1] @管理員 {features/term/查詢詞彙列表.feature}
+
+[STEP:2] @管理員 {features/term/查詢單一詞彙.feature}
+
+[STEP:3] @管理員 {features/term/建立詞彙.feature}
+
+[STEP:4] @管理員 {features/term/更新詞彙.feature}
+
+[STEP:5] @管理員 {features/term/排序詞彙.feature}
+
+[STEP:6] @管理員 {features/term/刪除詞彙.feature}
+[DECISION:6a] 刪除方式
+  [BRANCH:6a:單一刪除] @系統 刪除指定詞彙
+  [BRANCH:6a:批量刪除] @系統 逐一刪除詞彙
+[MERGE:6a]

@@ -1,0 +1,29 @@
+[ACTIVITY] 授權碼管理
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] Cloud API -> {specs/actors/CloudAPI.md}
+[ACTOR] 系統 -> {specs/actors/系統.md}
+[ACTOR] 子外掛 -> {specs/actors/子外掛.md}
+
+[STEP:1] @管理員 {features/license-code/查詢授權碼狀態.feature}
+
+[STEP:2] @管理員 {features/license-code/啟用授權碼.feature}
+[DECISION:2a] Cloud API 回應
+  [BRANCH:2a:200（啟用成功）] @系統 設定 transient 和 option，回傳授權資訊
+  [BRANCH:2a:401（授權碼無效）] @系統 回傳 WP_Error，清除 transient
+  [BRANCH:2a:其他錯誤（網路失敗等）] @系統 拋出例外，不清除既有 saved_code
+[MERGE:2a]
+
+[STEP:3] @管理員 {features/license-code/棄用授權碼.feature}
+[DECISION:3a] 棄用 API 回應
+  [BRANCH:3a:200（棄用成功）] @系統 清除 transient 和 option 中的 code
+  [BRANCH:3a:失敗] @系統 拋出例外
+[MERGE:3a]
+
+[STEP:4] @Cloud API {features/license-code/清除授權碼快取.feature}
+
+[STEP:5] @系統 {features/license-code/系統檢查授權碼.feature}
+[DECISION:5a] transient 是否過期
+  [BRANCH:5a:transient 有效] @系統 解密 transient 取得狀態
+  [BRANCH:5a:transient 過期且有 saved_code] @系統 重新啟用授權碼 -> 2
+  [BRANCH:5a:transient 過期且無 saved_code] @系統 使用預設未授權狀態
+[MERGE:5a]

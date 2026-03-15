@@ -1,0 +1,24 @@
+[ACTIVITY] 訂單管理
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 系統 -> {specs/actors/系統.md}
+[ACTOR] WooCommerce -> {specs/actors/WooCommerce.md}
+
+[STEP:1] @管理員 {features/order/查詢訂單列表.feature}
+
+[STEP:2] @管理員 {features/order/查詢單一訂單.feature}
+
+[STEP:3] @管理員 {features/order/查詢訂單選項.feature}
+
+[STEP:4] @管理員 {features/order/建立訂單.feature}
+
+[STEP:5] @管理員 {features/order/更新訂單.feature}
+
+[STEP:6] @管理員 {features/order/建立訂單備註.feature}
+
+[STEP:7] @管理員 {features/order/刪除訂單備註.feature}
+
+[STEP:8] @管理員 {features/order/刪除訂單.feature}
+[DECISION:8a] 刪除方式
+  [BRANCH:8a:單一刪除] @系統 刪除指定訂單
+  [BRANCH:8a:批量刪除] @系統 逐一刪除訂單
+[MERGE:8a]

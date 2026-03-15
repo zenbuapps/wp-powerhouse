@@ -1,0 +1,24 @@
+[ACTIVITY] 存取權限管理
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 系統 -> {specs/actors/系統.md}
+[ACTOR] WooCommerce -> {specs/actors/WooCommerce.md}
+
+[STEP:1] @管理員 {features/product/綁定權限項目到商品.feature}
+
+[STEP:2] @管理員 {features/product/更新綁定權限.feature}
+
+[STEP:3] @管理員 {features/product/解除綁定權限項目.feature}
+
+[STEP:4] @管理員 {features/limit/授權用戶存取.feature}
+[DECISION:4a] 授權來源
+  [BRANCH:4a:管理員手動授權] @系統 透過 API 觸發 grant_user_to_item action
+  [BRANCH:4a:訂單完成自動授權] @WooCommerce 透過 LifeCycle action 觸發
+[MERGE:4a]
+
+[STEP:5] @管理員 {features/limit/更新用戶存取期限.feature}
+
+[STEP:6] @管理員 {features/limit/撤銷用戶存取.feature}
+[DECISION:6a] 撤銷來源
+  [BRANCH:6a:管理員手動撤銷] @系統 透過 API 觸發 revoke_user_from_item action
+  [BRANCH:6a:訂閱失敗自動撤銷] @WooCommerce 透過訂閱 LifeCycle 觸發
+[MERGE:6a]

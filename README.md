@@ -54,14 +54,13 @@ Powerhouse is a **developer-focused WordPress plugin** that acts as a shared lib
 2. Upload to `wp-content/plugins/powerhouse/`
 3. Activate via **WordPress Admin → Plugins**
 
-### Development Setup (Turborepo Monorepo)
+### Development Setup
 
 ```bash
-# From the monorepo root
+# Install dependencies
 pnpm install
 
 # Install PHP dependencies
-cd apps/powerhouse
 composer install
 
 # Start Vite dev server (port 5179)
@@ -282,7 +281,7 @@ pnpm create:release  # Push GitHub release
 - **Vite** — build tool
 - **Refine.dev** — admin CRUD framework
 - **Ant Design 5** — UI components
-- **antd-toolkit** — workspace shared library
+- **antd-toolkit** — shared library
 - **React Query** — server state management
 - **Tailwind CSS** + **daisyUI** — styling (scoped to `#tw`)
 - **HashRouter** — client-side routing without server config

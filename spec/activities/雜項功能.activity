@@ -1,0 +1,33 @@
+[ACTIVITY] 雜項功能
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 系統 -> {specs/actors/系統.md}
+
+[STEP:1] @管理員 {features/misc/上傳檔案.feature}
+[DECISION:1a] 上傳模式
+  [BRANCH:1a:upload_only=0（上傳到媒體庫）] @系統 media_handle_upload 建立 attachment
+  [BRANCH:1a:upload_only=1（僅上傳到目錄）] @系統 wp_handle_upload 不建立 attachment
+[MERGE:1a]
+
+[STEP:2] @管理員 {features/misc/查詢上傳選項.feature}
+
+[STEP:3] @管理員 {features/misc/執行短碼.feature}
+
+[STEP:4] @管理員 {features/misc/查詢外掛列表.feature}
+
+[STEP:5] @管理員 {features/misc/查詢WooCommerce資訊.feature}
+
+[STEP:6] @管理員 {features/misc/查詢營收統計.feature}
+
+[STEP:7] @管理員 {features/misc/建立評論.feature}
+
+[STEP:8] @管理員 {features/misc/刪除評論.feature}
+
+[STEP:9] @管理員 {features/misc/查詢商品屬性列表.feature}
+
+[STEP:10] @管理員 {features/misc/建立商品屬性.feature}
+
+[STEP:11] @管理員 {features/misc/更新商品屬性.feature}
+
+[STEP:12] @管理員 {features/misc/刪除商品屬性.feature}
+
+[STEP:13] @管理員 {features/misc/複製文章.feature}

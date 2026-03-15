@@ -121,7 +121,7 @@ React 18 + TypeScript
     → Ant Design 5 (UI)
     → React Query (data fetching)
     → HashRouter (routing, no server config needed)
-    → antd-toolkit (workspace shared library)
+    → antd-toolkit (shared library)
 ```
 
 ---

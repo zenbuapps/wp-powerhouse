@@ -1,0 +1,25 @@
+[ACTIVITY] 用戶管理
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 系統 -> {specs/actors/系統.md}
+
+[STEP:1] @管理員 {features/user/查詢用戶列表.feature}
+
+[STEP:2] @管理員 {features/user/查詢單一用戶.feature}
+
+[STEP:3] @管理員 {features/user/查詢用戶選項.feature}
+
+[STEP:4] @管理員 {features/user/建立用戶.feature}
+[DECISION:4a] 請求參數模式
+  [BRANCH:4a:帶 qty 參數（批量新增）] @系統 逐一建立用戶
+  [BRANCH:4a:帶 ids 參數（批量更新）] @系統 逐一更新指定用戶
+[MERGE:4a]
+
+[STEP:5] @管理員 {features/user/更新用戶.feature}
+
+[STEP:6] @管理員 {features/user/重設密碼.feature}
+
+[STEP:7] @管理員 {features/user/刪除用戶.feature}
+[DECISION:7a] 刪除方式
+  [BRANCH:7a:單一刪除] @系統 wp_delete_user 永久刪除
+  [BRANCH:7a:批量刪除] @系統 逐一 wp_delete_user
+[MERGE:7a]

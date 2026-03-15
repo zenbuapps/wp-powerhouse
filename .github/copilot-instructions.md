@@ -355,7 +355,7 @@ Base::get_plugin_links();
 | Vite + `kucrut/vite-for-wp` | Build tool with WP integration |
 | Refine.dev | CRUD admin framework |
 | Ant Design 5 | UI components |
-| `antd-toolkit` | Shared workspace package (data providers, hooks) |
+| `antd-toolkit` | Shared package (data providers, hooks) |
 | React Query | Server state management |
 | TailwindCSS + daisyUI | Styling (scoped to `#tw`) |
 | HashRouter | Client-side routing (SPA in WP admin) |

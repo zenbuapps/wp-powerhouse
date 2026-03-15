@@ -1,0 +1,319 @@
+// Powerhouse Plugin - Entity Relationship Model
+// 從 spec/features/ 所有 .feature 文件推導而來
+// 格式：DBML (Database Markup Language)
+// 生成日期：2026-03-12
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+Enum post_status_enum {
+  publish  [note: '已發佈']
+  draft    [note: '草稿']
+  pending  [note: '待審核']
+  private  [note: '私人']
+  trash    [note: '回收桶']
+  inherit  [note: '繼承（附件用）']
+}
+
+Enum order_status_enum {
+  "wc-pending"    [note: '待付款']
+  "wc-processing" [note: '處理中']
+  "wc-on-hold"    [note: '暫停']
+  "wc-completed"  [note: '已完成']
+  "wc-cancelled"  [note: '已取消']
+  "wc-refunded"   [note: '已退款']
+  "wc-failed"     [note: '失敗']
+} // <!-- ?1[假設] 假設 WooCommerce 7 種預設狀態，實際可能因子外掛增加自訂狀態 -->
+
+Enum limit_type {
+  unlimited        [note: '無期限']
+  fixed            [note: '購買後固定時間']
+  assigned         [note: '指定日期（timestamp）']
+  follow_subscription [note: '跟隨 WooCommerce 訂閱，meta_value 格式為 subscription_{id}']
+} // <!-- ?2[假設] 從 limit/ features 和 product/綁定權限項目到商品.feature 的 limit_type: fixed_date 推斷；"fixed_date" 與 "fixed" 名稱不一致，以程式碼實際值為準 -->
+
+Enum limit_unit {
+  timestamp [note: 'Unix 時間戳']
+  day       [note: '天']
+  month     [note: '月']
+  year      [note: '年']
+}
+
+// ============================================================
+// POWERHOUSE 自訂表
+// ============================================================
+
+Table ph_access_itemmeta {
+  meta_id  integer [pk, increment]
+  post_id  integer [not null, note: '被授權的內容項目 ID（如課程 ID）；ref: wp_posts.ID']
+  user_id  integer [not null, note: '被授權的用戶 ID；ref: wp_users.ID']
+  meta_key varchar(255) [not null, note: '目前固定為 expire_date']
+  meta_value longtext [not null, note: 'Unix timestamp 整數字串、"0"（無期限）、或 "subscription_{id}"（訂閱綁定）']
+
+  indexes {
+    (user_id, post_id, meta_key) [unique, name: 'uq_user_post_meta']
+    (post_id) [name: 'idx_post_id']
+    (user_id) [name: 'idx_user_id']
+  }
+
+  Note: '''
+    Powerhouse 自訂存取權限 meta 表，在外掛啟用時建立（register_activation_hook）。
+    Limit 域的 grant/update/revoke 操作均讀寫此表。
+
+    meta_value 格式：
+    - "0" = 無期限（timestamp=0）
+    - 10 位數字字串 = Unix timestamp（如 "1800000000"）
+    - "subscription_{id}" = 與 WooCommerce 訂閱 {id} 綁定
+
+    觸發的 WordPress action：
+    - powerhouse/limit/after_grant_user_to_item
+    - powerhouse/limit/after_update_user_from_item
+    - powerhouse/limit/after_revoke_user_from_item
+  '''
+}
+
+// ============================================================
+// wp_options 中 Powerhouse 使用的關鍵 options（虛擬表描述）
+// ============================================================
+
+Table powerhouse_settings {
+  // 此並非獨立表，儲存於 wp_options.option_name = 'powerhouse_settings'（JSON 物件）
+  enable_manual_send_email           varchar [note: 'yes/no，預設 no']
+  enable_captcha_login               varchar [note: 'yes/no，預設 no']
+  captcha_role_list                  text    [note: 'JSON array，如 ["administrator"]']
+  enable_captcha_register            varchar [note: 'yes/no，預設 no']
+  enable_email_domain_check_register varchar [note: 'yes/no，預設 yes']
+  enable_email_domain_check_wp_mail  varchar [note: 'yes/no，預設 yes']
+  email_domain_check_white_list      text    [note: 'JSON array，允許的 email domain 列表']
+  delay_email                        varchar [note: 'yes/no，預設 yes']
+  last_name_optional                 varchar [note: 'yes/no，預設 yes']
+  theme                              varchar [note: '主題名稱，如 power、default']
+  enable_theme_changer               varchar [note: 'yes/no，預設 no']
+  enable_theme                       varchar [note: 'yes/no，預設 yes']
+  theme_css                          text    [note: 'JSON object，自訂 CSS 設定']
+  api_booster_rules                  text    [note: 'JSON array，API 快取規則']
+  api_booster_rule_recipes           text    [note: 'JSON array，API 快取食譜']
+  bunny_library_id                   varchar [note: 'BunnyCDN Library ID（可空）']
+  bunny_cdn_hostname                 varchar [note: 'BunnyCDN CDN hostname（可空）']
+  bunny_stream_api_key               varchar [note: 'BunnyCDN Stream API Key（可空）']
+
+  Note: '''
+    虛擬表：描述 wp_options.powerhouse_settings 的 JSON 物件結構。
+    透過 Settings Domain 的 GET /options 讀取，POST /options 以 partial_update 寫入。
+    允許更新的欄位由 powerhouse/option/allowed_fields filter 控制。
+    子外掛可透過此 filter 新增自訂欄位，透過 powerhouse/option/skip_sanitize_keys 跳過 sanitize。
+  '''
+}
+
+Table powerhouse_license_codes {
+  // 此並非獨立表，儲存於 wp_options.option_name = 'powerhouse_license_codes'（JSON 物件）
+  product_slug varchar [pk, note: '子外掛識別碼，如 power-course、power-partner']
+  code         varchar [note: '已儲存的授權碼（saved_code），如 XXXX-XXXX-XXXX-XXXX']
+
+  Note: '''
+    虛擬表：描述 wp_options.powerhouse_license_codes 的 JSON 物件結構。
+    格式：{product_slug: code}，如 {"power-course": "TEST-CODE-01"}。
+    授權碼狀態透過 lc_{product_slug} transient 快取（AES 加密，TTL 24 小時）。
+    transient 解密後結構：{code, post_status, expire_date, type, product_slug, product_name}
+    transient 不存在時，自動以 saved_code 呼叫 CloudAPI (cloud.luke.cafe) 重新驗證。
+    CloudAPI 返回 401 時清除授權狀態；連線失敗時維持啟用狀態（容錯）。
+  '''
+}
+
+// ============================================================
+// WordPress CORE TABLES（Powerhouse 操作的核心表，僅描述相關欄位）
+// ============================================================
+
+Table wp_posts {
+  ID           integer [pk, increment]
+  post_author  integer [not null, default: 0, note: 'ref: wp_users.ID']
+  post_title   text    [not null]
+  post_content longtext [not null]
+  post_status  post_status_enum [not null, default: 'draft']
+  post_type    varchar(20) [not null, default: 'post', note: 'post, page, attachment, product, shop_order, 及自訂 CPT']
+  post_parent  integer [not null, default: 0, note: '父文章 ID，0 表示頂層']
+  menu_order   integer [not null, default: 0, note: '手動排序欄位，Powerhouse 排序功能依此排列']
+  post_date    timestamp [not null]
+  post_modified timestamp [not null]
+
+  Note: '''
+    WordPress wp_posts 表（含 WooCommerce Product、Order 的底層儲存）。
+    Post 域：CRUD + 批次刪除 + 排序（menu_order）+ 深度查詢（depth 參數）+ 複製。
+    Product 域：透過 WC_Product API 操作，支援商品變體、屬性、多圖片。
+    Order 域：透過 WC_Order API 操作（或 HPOS 模式）。
+    menu_order 欄位供文章和詞彙排序使用。
+  '''
+}
+
+Table wp_postmeta {
+  meta_id   integer [pk, increment]
+  post_id   integer [not null, note: 'ref: wp_posts.ID']
+  meta_key  varchar(255) [note: '如 _thumbnail_id、_price、_course_ids 等']
+  meta_value longtext
+
+  Note: '''
+    WordPress wp_postmeta 表。
+    Powerhouse 透過 meta_keys 參數回傳任意 meta 欄位。
+    商品綁定的觀看權限（如 _course_ids）儲存於此表（JSON 序列化的 BoundItemsData）。
+    BoundItemData 結構：{item_id, limit: {limit_type, limit_value, limit_unit}}
+  '''
+}
+
+Table wp_users {
+  ID              integer [pk, increment]
+  user_login      varchar(60) [not null, unique]
+  user_pass       varchar(255) [not null]
+  user_email      varchar(100) [not null, unique]
+  display_name    varchar(250) [not null]
+  user_registered timestamp [not null]
+
+  Note: '''
+    WordPress wp_users 表。
+    User 域：查詢列表（支援 role、meta_keys 篩選）、建立（qty 批次）、更新、批次刪除、重設密碼。
+    批次上限（BATCH_SIZE）= 100。
+  '''
+}
+
+Table wp_usermeta {
+  umeta_id  integer [pk, increment]
+  user_id   integer [not null, note: 'ref: wp_users.ID']
+  meta_key  varchar(255) [note: '如 wp_capabilities、billing_phone 等']
+  meta_value longtext
+
+  Note: 'Powerhouse 透過 meta_keys 參數回傳任意 user meta 欄位。'
+}
+
+Table wp_terms {
+  term_id    integer [pk, increment]
+  name       varchar(200) [not null]
+  slug       varchar(200) [not null, unique]
+  term_group integer [not null, default: 0]
+
+  Note: '''
+    WordPress wp_terms 表。
+    Term 域：依 taxonomy 操作，支援 CRUD + 排序。
+    預設回傳頂層詞彙（parent=0），預設含空詞彙（hide_empty=false）。
+  '''
+}
+
+Table wp_term_taxonomy {
+  term_taxonomy_id integer [pk, increment]
+  term_id          integer [not null, note: 'ref: wp_terms.term_id']
+  taxonomy         varchar(32) [not null, note: '如 product_cat、post_tag 等']
+  description      longtext [not null]
+  parent           integer [not null, default: 0]
+  count            integer [not null, default: 0]
+
+  Note: 'WordPress wp_term_taxonomy 表。與 wp_terms 一起構成完整詞彙結構。'
+}
+
+Table wp_termmeta {
+  meta_id   integer [pk, increment]
+  term_id   integer [not null, note: 'ref: wp_terms.term_id']
+  meta_key  varchar(255) [note: '排序功能使用 "order"（整數字串）；縮圖使用 "thumbnail_id"']
+  meta_value longtext
+
+  Note: '''
+    WordPress wp_termmeta 表。
+    Powerhouse Term 排序功能：使用自訂 SQL 依 termmeta.meta_key="order" 的數值排序。
+    排序規則：order ASC，相同 order 依 term_id DESC。
+    thumbnail_id meta 支援透過 filter 上傳縮圖。
+  '''
+}
+
+Table wp_comments {
+  comment_ID           integer [pk, increment]
+  comment_post_ID      integer [not null, note: 'ref: wp_posts.ID；訂單備註時為訂單 ID']
+  comment_author       tinytext [not null, note: '評論者名稱（來自 wp_get_current_user()->display_name）']
+  comment_author_email varchar(100) [not null]
+  comment_date         datetime [not null]
+  comment_content      text [not null, note: '備註/評論內容']
+  comment_type         varchar(20) [not null, default: '', note: '如 order_note、comment']
+  comment_approved     varchar(20) [not null, default: '1']
+
+  Note: '''
+    WordPress wp_comments 表。
+    Comment 域：POST 建立（author 自動從 wp_get_current_user() 取得）、DELETE 刪除。
+    Order Note 域：透過 wc_create_order_note() 建立，回傳 comment_id。
+    is_customer_note=1 表示客戶可見。
+  '''
+}
+
+Table wp_commentmeta {
+  meta_id    integer [pk, increment]
+  comment_id integer [not null, note: 'ref: wp_comments.comment_ID']
+  meta_key   varchar(255) [note: '如 is_customer_note、commented_user_id']
+  meta_value longtext
+
+  Note: 'Powerhouse 評論建立時寫入 is_customer_note（0/1）和 commented_user_id（整數）。'
+}
+
+Table wp_options {
+  option_id    integer [pk, increment]
+  option_name  varchar(191) [not null, unique]
+  option_value longtext [not null]
+  autoload     varchar(20) [not null, default: 'yes']
+
+  Note: '''
+    WordPress wp_options 表。
+    Powerhouse 使用：
+    - powerhouse_settings：JSON 設定物件
+    - powerhouse_license_codes：JSON 授權碼對映 {product_slug: code}
+    WooCommerce 屬性表 woocommerce_attribute_taxonomies 也儲存於此。
+  '''
+}
+
+// ============================================================
+// WooCommerce ANALYTICS（Report 域依賴）
+// ============================================================
+
+Table wc_order_stats {
+  order_id      integer [pk, note: 'ref: wp_posts.ID（或 wc_orders.id）']
+  date_created  timestamp [not null]
+  status        varchar(20) [not null]
+  total_sales   decimal [not null, default: 0]
+  net_total     decimal [not null, default: 0]
+  refund_total  decimal [not null, default: 0]
+  gross_total   decimal [not null, default: 0]
+  num_items_sold integer [not null, default: 0]
+  customer_id   integer [note: 'ref: wp_users.ID']
+
+  Note: '''
+    WooCommerce Analytics 訂單統計彙整表。
+    Powerhouse Report 域（GET /reports/revenue/stats）依賴此表透過 WC Analytics Query API 計算。
+    Powerhouse 擴展：額外計算 refunded_orders_count（status=wc-refunded 的訂單數）
+    和 non_refunded_orders_count（非 wc-refunded 的訂單數）。
+    只有 REQUEST_URI 包含 "/wp-json/power-course" 時才啟用額外欄位計算。
+  ''' // <!-- ?3[假設] 額外欄位（refunded_orders_count、non_refunded_orders_count）的觸發條件從 Report/Revenue/Core/V2Api.php 推斷，條件為 REQUEST_URI 包含 '/wp-json/power-course'，此為歷史遺留設計，未來可能需要修正為 powerhouse 相關路徑 -->
+}
+
+// ============================================================
+// RELATIONSHIPS
+// ============================================================
+
+// ph_access_itemmeta 與核心表
+Ref: ph_access_itemmeta.post_id > wp_posts.ID     // many-to-one：存取記錄 → 內容項目
+Ref: ph_access_itemmeta.user_id > wp_users.ID     // many-to-one：存取記錄 → 用戶
+
+// wp_posts 自我參照
+Ref: wp_posts.post_parent > wp_posts.ID           // many-to-one：子文章 → 父文章
+
+// wp_posts 與 meta
+Ref: wp_postmeta.post_id > wp_posts.ID            // many-to-one
+Ref: wp_posts.post_author > wp_users.ID           // many-to-one：文章作者
+
+// wp_users 與 meta
+Ref: wp_usermeta.user_id > wp_users.ID            // many-to-one
+
+// wp_terms 與 taxonomy
+Ref: wp_term_taxonomy.term_id > wp_terms.term_id  // many-to-one
+Ref: wp_termmeta.term_id > wp_terms.term_id       // many-to-one
+
+// wp_comments 與 posts
+Ref: wp_comments.comment_post_ID > wp_posts.ID    // many-to-one：評論/備註 → 文章/訂單
+Ref: wp_commentmeta.comment_id > wp_comments.comment_ID  // many-to-one
+
+// WooCommerce Analytics
+Ref: wc_order_stats.order_id > wp_posts.ID        // one-to-one：統計 → 訂單
+Ref: wc_order_stats.customer_id > wp_users.ID     // many-to-one（可 null）

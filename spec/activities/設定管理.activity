@@ -1,0 +1,13 @@
+[ACTIVITY] 設定管理
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 系統 -> {specs/actors/系統.md}
+[ACTOR] 子外掛 -> {specs/actors/子外掛.md}
+
+[STEP:1] @管理員 {features/settings/查詢設定.feature}
+
+[STEP:2] @管理員 {features/settings/更新設定.feature}
+[DECISION:2a] 欄位是否在允許清單中
+  [BRANCH:2a:欄位在 allowed_fields 清單中] @系統 寫入 wp_options
+  [BRANCH:2a:欄位為 powerhouse_settings] @系統 執行 partial_update
+  [BRANCH:2a:欄位不在允許清單中] @系統 略過該欄位
+[MERGE:2a]

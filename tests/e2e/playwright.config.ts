@@ -1,32 +1,67 @@
-import { defineConfig } from '@playwright/test'
+/**
+ * Playwright 測試配置
+ *
+ * Powerhouse 核心外掛 E2E 測試設定。
+ * Port: 8898
+ * 認證: Cookie + Nonce（管理員）
+ */
+import { defineConfig, devices } from '@playwright/test'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const STORAGE_STATE = path.join(__dirname, '.auth', 'admin.json')
 
 export default defineConfig({
   testDir: '.',
   testMatch: ['**/*.spec.ts'],
   fullyParallel: false,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
-  retries: 0,
+  reporter: process.env.CI
+    ? [['github'], ['html', { open: 'never' }]]
+    : [['list'], ['html', { open: 'on-failure' }]],
+
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: [
-    ['list'],
-    ['html', { open: 'never' }],
-  ],
-  use: {
-    baseURL: 'http://localhost:8898',
-    storageState: '.auth/admin.json',
-    extraHTTPHeaders: {
-      'X-WP-Nonce': '',
-    },
-    trace: 'on-first-retry',
-  },
+
   globalSetup: './global-setup.ts',
   globalTeardown: './global-teardown.ts',
+
+  use: {
+    headless: true,
+    baseURL: process.env.WP_BASE_URL || 'http://localhost:8898',
+    storageState: STORAGE_STATE,
+    locale: 'zh-TW',
+    timezoneId: 'Asia/Taipei',
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    actionTimeout: 10_000,
+    navigationTimeout: 15_000,
+  },
+
   projects: [
     {
-      name: 'api-tests',
-      testDir: '.',
-      testMatch: ['**/*.spec.ts'],
+      name: 'admin',
+      testDir: './01-admin',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1920, height: 1080 },
+        storageState: STORAGE_STATE,
+      },
+    },
+    {
+      name: 'frontend',
+      testDir: './02-frontend',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'integration',
+      testDir: './03-integration',
+      timeout: 120_000,
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
 })
