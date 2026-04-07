@@ -48,7 +48,7 @@ final class Plugin {
 		$this->init(
 		[
 			'app_name'     => 'Powerhouse',
-			'github_repo'  => 'https://github.com/j7-dev/wp-powerhouse',
+			'github_repo'  => 'https://github.com/p9-cloud/wp-powerhouse',
 			'callback'     => [ Bootstrap::class, 'instance' ],
 			'priority'     => -10,
 			'lc'           => false,

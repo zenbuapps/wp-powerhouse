@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "77fb0f53a2e619363988590b0c9a1430",
+    "content-hash": "d3355e6127d0daf1ce1251e1b16d3631",
     "packages": [
         {
             "name": "brainfoolong/js-aes-php",
@@ -445,16 +445,16 @@
     "packages-dev": [
         {
             "name": "arts/elementor-stubs",
-            "version": "v3.35.6.1",
+            "version": "v3.35.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/artkrsk/elementor-stubs.git",
-                "reference": "f2a48e2755fa5987a14682bb34b3e237c1cdf978"
+                "reference": "a4493b64ed43b430dde55394087f233e7aeb552e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/artkrsk/elementor-stubs/zipball/f2a48e2755fa5987a14682bb34b3e237c1cdf978",
-                "reference": "f2a48e2755fa5987a14682bb34b3e237c1cdf978",
+                "url": "https://api.github.com/repos/artkrsk/elementor-stubs/zipball/a4493b64ed43b430dde55394087f233e7aeb552e",
+                "reference": "a4493b64ed43b430dde55394087f233e7aeb552e",
                 "shasum": ""
             },
             "require": {
@@ -500,7 +500,7 @@
             ],
             "support": {
                 "issues": "https://github.com/artkrsk/elementor-stubs/issues",
-                "source": "https://github.com/artkrsk/elementor-stubs/tree/v3.35.6.1"
+                "source": "https://github.com/artkrsk/elementor-stubs/tree/v3.35.7"
             },
             "funding": [
                 {
@@ -508,7 +508,7 @@
                     "type": "buy_me_a_coffee"
                 }
             ],
-            "time": "2026-03-05T15:10:56+00:00"
+            "time": "2026-03-15T00:44:02+00:00"
         },
         {
             "name": "dealerdirect/phpcodesniffer-composer-installer",
@@ -608,16 +608,16 @@
         },
         {
             "name": "php-stubs/woocommerce-stubs",
-            "version": "v10.5.2",
+            "version": "v10.6.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/php-stubs/woocommerce-stubs.git",
-                "reference": "4b01d69e3bd0e22e125973e3049b1cd7249a86f3"
+                "reference": "2cc4a2e110a4c6c93c2d4d06c786afa1faa2e9b8"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/php-stubs/woocommerce-stubs/zipball/4b01d69e3bd0e22e125973e3049b1cd7249a86f3",
-                "reference": "4b01d69e3bd0e22e125973e3049b1cd7249a86f3",
+                "url": "https://api.github.com/repos/php-stubs/woocommerce-stubs/zipball/2cc4a2e110a4c6c93c2d4d06c786afa1faa2e9b8",
+                "reference": "2cc4a2e110a4c6c93c2d4d06c786afa1faa2e9b8",
                 "shasum": ""
             },
             "require": {
@@ -646,9 +646,9 @@
             ],
             "support": {
                 "issues": "https://github.com/php-stubs/woocommerce-stubs/issues",
-                "source": "https://github.com/php-stubs/woocommerce-stubs/tree/v10.5.2"
+                "source": "https://github.com/php-stubs/woocommerce-stubs/tree/v10.6.2"
             },
-            "time": "2026-02-16T20:45:34+00:00"
+            "time": "2026-03-31T18:29:22+00:00"
         },
         {
             "name": "php-stubs/woocommerce-subscriptions-stubs",
@@ -1079,11 +1079,11 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.1.39",
+            "version": "2.1.46",
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/c6f73a2af4cbcd99c931d0fb8f08548cc0fa8224",
-                "reference": "c6f73a2af4cbcd99c931d0fb8f08548cc0fa8224",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/a193923fc2d6325ef4e741cf3af8c3e8f54dbf25",
+                "reference": "a193923fc2d6325ef4e741cf3af8c3e8f54dbf25",
                 "shasum": ""
             },
             "require": {
@@ -1128,7 +1128,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-02-11T14:48:56+00:00"
+            "time": "2026-04-01T09:25:14+00:00"
         },
         {
             "name": "squizlabs/php_codesniffer",
