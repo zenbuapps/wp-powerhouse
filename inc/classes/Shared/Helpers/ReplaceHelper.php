@@ -79,6 +79,12 @@ final class ReplaceHelper {
 	 * @return void
 	 */
 	private function init(): void {
+		// $this->obj 尚未設定（null）時不需要解析 placeholders
+		if ($this->obj === null) {
+			$this->all_placeholders_with_tag = [];
+			$this->all_placeholders          = [];
+			return;
+		}
 		// 取得目前物件的類型（由 EObjectType 決定）
 		$object_type = EObjectType::get_type( $this->obj);
 
