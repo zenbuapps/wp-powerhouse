@@ -32,3 +32,6 @@ release/*
 *.sw?
 
 /vendor/
+
+# PHPUnit
+.phpunit.result.cache
