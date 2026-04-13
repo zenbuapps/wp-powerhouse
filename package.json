@@ -25,7 +25,11 @@
 		"sync:version": "wp-update-project-version -s package.json -p plugin.php",
 		"replace-string": "node ./replace-string.cjs",
 		"i18n": "wp i18n make-pot . languages/power_docs.pot",
-		"i18n:commit": "pnpm i18n && git add . && git commit --amend --no-edit"
+		"i18n:commit": "pnpm i18n && git add . && git commit --amend --no-edit",
+		"env:start": "npx wp-env start",
+		"env:stop": "npx wp-env stop",
+		"env:destroy": "npx wp-env destroy",
+		"test:phpunit": "npx wp-env run tests-cli --env-cwd=wp-content/plugins/powerhouse composer run test"
 	},
 	"dependencies": {
 		"@ant-design/cssinjs": "1.23.0",
@@ -77,6 +81,7 @@
 		"@typescript-eslint/parser": "^7.15.0",
 		"@vitejs/plugin-react": "^4.6.0",
 		"@wordpress/element": "^6.27.0",
+		"@wordpress/env": "^11.1.0",
 		"@wordpress/eslint-plugin": "^17.11.0",
 		"@wordpress/html-entities": "^4.27.0",
 		"@wordpress/i18n": "^6.0.0",

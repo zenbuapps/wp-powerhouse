@@ -45,10 +45,23 @@
     "php-stubs/wordpress-stubs": "@stable",
     "phpstan/extension-installer": "@stable",
     "arts/elementor-stubs": "^3.35",
-    "php-stubs/woocommerce-subscriptions-stubs": "^8.4"
+    "php-stubs/woocommerce-subscriptions-stubs": "^8.4",
+    "phpunit/phpunit": "^9.6",
+    "yoast/phpunit-polyfills": "^1.0",
+    "wp-phpunit/wp-phpunit": "^6.3"
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\Integration\\": "tests/Integration/"
+    }
   },
   "scripts": {
-    "lint": "phpcs"
+    "lint": "phpcs",
+    "test": "phpunit --testsuite Integration",
+    "test:smoke": "phpunit --testsuite Integration --group smoke",
+    "test:happy": "phpunit --testsuite Integration --group happy",
+    "test:error": "phpunit --testsuite Integration --group error",
+    "test:edge": "phpunit --testsuite Integration --group edge"
   },
   "conflict": {
     "symfony/finder": ">6.0.19"
