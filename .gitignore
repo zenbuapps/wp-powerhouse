@@ -35,3 +35,6 @@ release/*
 
 # PHPUnit
 .phpunit.result.cache
+
+# Claude Code 子 worktree（由 sub-agent 臨時建立）
+.claude/worktrees/
