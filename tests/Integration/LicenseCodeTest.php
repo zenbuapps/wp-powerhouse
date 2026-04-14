@@ -352,4 +352,494 @@ class LicenseCodeTest extends TestCase {
 	public function LC_CACHE_TIME_應為_24_小時(): void {
 		$this->assertSame( 24 * HOUR_IN_SECONDS, LCBase::CACHE_TIME );
 	}
+
+	// ========== REST API 測試 — activate ==========
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function REST_lc_activate_端點應已被註冊(): void {
+		$this->assert_rest_route_registered( '/v2/powerhouse/lc/activate' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 *
+	 * 注意：WP::include_required_params() 拋出 Exception，REST 框架將其轉為 500。
+	 * 此為生產程式碼的已知行為（非 400）。
+	 */
+	public function activate_缺少_code_參數_應回傳_4xx_或_5xx(): void {
+		$response = $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/activate',
+			[ 'product_slug' => 'power-course' ]
+		);
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), '缺少 code 參數應回傳錯誤狀態碼' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 *
+	 * 注意：WP::include_required_params() 拋出 Exception，REST 框架將其轉為 500。
+	 * 此為生產程式碼的已知行為（非 400）。
+	 */
+	public function activate_缺少_product_slug_參數_應回傳_4xx_或_5xx(): void {
+		$response = $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/activate',
+			[ 'code' => self::TEST_CODE ]
+		);
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), '缺少 product_slug 參數應回傳錯誤狀態碼' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function activate_CloudAPI_回傳_200_時_應儲存授權碼並回傳成功(): void {
+		// Stub Cloud API：回傳成功的授權資料
+		$cloud_response_body = [
+			'id'           => 1,
+			'code'         => self::TEST_CODE,
+			'post_status'  => 'activated',
+			'expire_date'  => time() + 365 * DAY_IN_SECONDS,
+			'type'         => 'standard',
+			'product_slug' => 'power-course',
+			'product_name' => 'Power Course',
+		];
+		$this->stub_http_request(
+			'power-partner-server/license-codes',
+			[
+				'response' => [ 'code' => 200, 'message' => 'OK' ],
+				'body'     => \wp_json_encode( $cloud_response_body ),
+				'headers'  => [],
+			]
+		);
+
+		$response = $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/activate',
+			[
+				'code'         => self::TEST_CODE,
+				'product_slug' => 'power-course',
+			]
+		);
+
+		$data = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertIsArray( $data );
+		$this->assertSame( 'activate_lc_success', $data['code'] );
+		$this->assertStringContainsString( self::TEST_CODE, $data['message'] );
+
+		// 確認 saved_code 已儲存到 option
+		/** @var array<string, string> $saved_codes */
+		$saved_codes = \get_option( LCBase::KEY, [] );
+		$this->assertArrayHasKey( 'power-course', $saved_codes );
+		$this->assertSame( self::TEST_CODE, $saved_codes['power-course'] );
+
+		// 確認 transient 已設置
+		$transient = \get_transient( 'lc_power-course' );
+		$this->assertNotFalse( $transient, 'activate 成功後 transient lc_power-course 應已設置' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function activate_CloudAPI_回傳_401_時_應回傳_500_錯誤(): void {
+		// Stub Cloud API：回傳 401（授權碼無效）
+		$this->stub_http_request(
+			'power-partner-server/license-codes',
+			[
+				'response' => [ 'code' => 401, 'message' => 'Unauthorized' ],
+				'body'     => \wp_json_encode( [ 'message' => '授權碼無效' ] ),
+				'headers'  => [],
+			]
+		);
+
+		$response = $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/activate',
+			[
+				'code'         => 'INVALID-CODE',
+				'product_slug' => 'power-course',
+			]
+		);
+
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), 'CloudAPI 401 時應回傳 4xx/5xx' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function activate_CloudAPI_回傳_500_時_應回傳_500_錯誤(): void {
+		// Stub Cloud API：回傳 500（伺服器錯誤）
+		$this->stub_http_request(
+			'power-partner-server/license-codes',
+			[
+				'response' => [ 'code' => 500, 'message' => 'Internal Server Error' ],
+				'body'     => \wp_json_encode( [ 'message' => '伺服器錯誤' ] ),
+				'headers'  => [],
+			]
+		);
+
+		$response = $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/activate',
+			[
+				'code'         => self::TEST_CODE,
+				'product_slug' => 'power-course',
+			]
+		);
+
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), 'CloudAPI 500 時應回傳 4xx/5xx' );
+	}
+
+	// ========== REST API 測試 — deactivate ==========
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function REST_lc_deactivate_端點應已被註冊(): void {
+		$this->assert_rest_route_registered( '/v2/powerhouse/lc/deactivate' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 *
+	 * 注意：WP::include_required_params() 拋出 Exception，REST 框架將其轉為 500。
+	 * 此為生產程式碼的已知行為（非 400）。
+	 */
+	public function deactivate_缺少_code_參數_應回傳_4xx_或_5xx(): void {
+		$response = $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/deactivate',
+			[ 'product_slug' => 'power-course' ]
+		);
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), '缺少 code 參數應回傳錯誤狀態碼' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 *
+	 * 注意：WP::include_required_params() 拋出 Exception，REST 框架將其轉為 500。
+	 * 此為生產程式碼的已知行為（非 400）。
+	 */
+	public function deactivate_缺少_product_slug_參數_應回傳_4xx_或_5xx(): void {
+		$response = $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/deactivate',
+			[ 'code' => self::TEST_CODE ]
+		);
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), '缺少 product_slug 參數應回傳錯誤狀態碼' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function deactivate_CloudAPI_回傳_200_時_應清除授權碼並回傳成功(): void {
+		// 先設置初始狀態：transient 和 saved_code 都存在
+		$this->set_activated_lc_transient( 'power-course', self::TEST_CODE );
+		$saved_codes = [ 'power-course' => self::TEST_CODE ];
+		\update_option( LCBase::KEY, $saved_codes );
+
+		// Stub Cloud API
+		$this->stub_http_request(
+			'power-partner-server/license-codes',
+			[
+				'response' => [ 'code' => 200, 'message' => 'OK' ],
+				'body'     => \wp_json_encode( [ 'message' => 'deactivated' ] ),
+				'headers'  => [],
+			]
+		);
+
+		$response = $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/deactivate',
+			[
+				'code'         => self::TEST_CODE,
+				'product_slug' => 'power-course',
+			]
+		);
+
+		$data = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertIsArray( $data );
+		$this->assertSame( 'deactivate_lc_success', $data['code'] );
+		$this->assertStringContainsString( self::TEST_CODE, $data['message'] );
+
+		// 確認 transient 已清除
+		$this->assertFalse( \get_transient( 'lc_power-course' ), 'deactivate 後 transient 應已刪除' );
+
+		// 確認 saved_code 已移除
+		/** @var array<string, string> $updated_codes */
+		$updated_codes = \get_option( LCBase::KEY, [] );
+		$this->assertArrayNotHasKey( 'power-course', $updated_codes );
+	}
+
+	// ========== REST API 測試 — invalidate ==========
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function REST_lc_invalidate_端點應已被註冊(): void {
+		$this->assert_rest_route_registered( '/v2/powerhouse/lc/invalidate' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 *
+	 * 注意：當 body 為空時 $body_params['product_slug'] 在 PHP 8 中為 undefined array key，
+	 * 可能拋出 TypeError 而非回傳 400。若回傳 500 屬已知行為，此測試僅驗證為錯誤狀態碼。
+	 * 若 product_slug 明確傳空字串，則應回傳 400 with 'invalidate_lc_cache_failed'。
+	 */
+	public function invalidate_缺少_product_slug_應回傳_錯誤狀態碼(): void {
+		$response = $this->rest_request_as_guest(
+			'POST',
+			'/v2/powerhouse/lc/invalidate',
+			[]
+		);
+
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), '缺少 product_slug 應回傳 4xx 或 5xx' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function invalidate_傳入空字串_product_slug_應回傳_400(): void {
+		$response = $this->rest_request_as_guest(
+			'POST',
+			'/v2/powerhouse/lc/invalidate',
+			[ 'product_slug' => '' ]
+		);
+		$data = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertIsArray( $data );
+		$this->assertSame( 'invalidate_lc_cache_failed', $data['code'] );
+		$this->assertSame( '產品 Slug 不能為空', $data['message'] );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function invalidate_成功時_清除_transient_並回傳_200(): void {
+		// 先設置 transient
+		$this->set_activated_lc_transient( 'power-course', self::TEST_CODE );
+		$saved_codes = [ 'power-course' => self::TEST_CODE ];
+		\update_option( LCBase::KEY, $saved_codes );
+
+		$response = $this->rest_request_as_guest(
+			'POST',
+			'/v2/powerhouse/lc/invalidate',
+			[ 'product_slug' => 'power-course' ]
+		);
+
+		$data = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertIsArray( $data );
+		$this->assertSame( 'invalidate_lc_cache_success', $data['code'] );
+		$this->assertSame( 'power-course', $data['data']['product_slug'] );
+
+		// 確認 transient 已清除
+		$this->assertFalse( \get_transient( 'lc_power-course' ), 'invalidate 後 transient 應已刪除' );
+
+		// 確認 saved_code 已移除
+		/** @var array<string, string> $updated_codes */
+		$updated_codes = \get_option( LCBase::KEY, [] );
+		$this->assertArrayNotHasKey( 'power-course', $updated_codes );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function invalidate_未認證請求也可成功清除快取(): void {
+		$this->set_activated_lc_transient( 'power-course', self::TEST_CODE );
+
+		// 未認證請求（guest）
+		$response = $this->rest_request_as_guest(
+			'POST',
+			'/v2/powerhouse/lc/invalidate',
+			[ 'product_slug' => 'power-course' ]
+		);
+
+		$this->assertSame( 200, $response->get_status() );
+	}
+
+	// ========== REST API 測試 — GET lc（查詢授權碼狀態）==========
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function REST_GET_lc_端點應已被註冊(): void {
+		$this->assert_rest_route_registered( '/v2/powerhouse/lc' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function GET_lc_transient_存在時_應回傳快取授權狀態(): void {
+		// 建立假產品並設置 transient
+		$this->register_lc_product( 'power-course', 'Power Course' );
+		$this->set_activated_lc_transient( 'power-course', 'TEST-CODE-01' );
+
+		$response = $this->rest_request_as_admin( 'GET', '/v2/powerhouse/lc' );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertIsArray( $data );
+
+		// 找到 power-course 的授權資訊
+		$found = null;
+		foreach ( $data as $item ) {
+			if ( isset( $item['product_slug'] ) && 'power-course' === $item['product_slug'] ) {
+				$found = $item;
+				break;
+			}
+		}
+
+		$this->assertNotNull( $found, 'data 陣列中應包含 power-course 的授權資訊' );
+		$this->assertSame( 'activated', $found['post_status'] );
+		$this->assertSame( 'TEST-CODE-01', $found['code'] );
+
+		// 清理
+		\remove_all_filters( 'powerhouse_product_infos' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function GET_lc_無_transient_無_saved_code_時_應回傳預設空狀態(): void {
+		// 建立假產品（沒有 transient，也沒有 saved_code）
+		$this->register_lc_product( 'power-course', 'Power Course' );
+
+		$response = $this->rest_request_as_admin( 'GET', '/v2/powerhouse/lc' );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertIsArray( $data );
+
+		$found = null;
+		foreach ( $data as $item ) {
+			if ( isset( $item['product_slug'] ) && 'power-course' === $item['product_slug'] ) {
+				$found = $item;
+				break;
+			}
+		}
+
+		$this->assertNotNull( $found, 'data 陣列中應包含 power-course 的預設授權資訊' );
+		$this->assertSame( '', $found['post_status'], '無授權時 post_status 應為空字串' );
+		$this->assertSame( '', $found['code'], '無授權時 code 應為空字串' );
+
+		// 清理
+		\remove_all_filters( 'powerhouse_product_infos' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function GET_lc_無_transient_但有_saved_code_且_CloudAPI_回傳_200_時_應重新啟用(): void {
+		// 建立假產品並設置 saved_code（但沒有 transient）
+		$this->register_lc_product( 'power-course', 'Power Course' );
+		\update_option( LCBase::KEY, [ 'power-course' => self::TEST_CODE ] );
+
+		// Stub Cloud API：回傳成功
+		$cloud_response_body = [
+			'id'           => 1,
+			'code'         => self::TEST_CODE,
+			'post_status'  => 'activated',
+			'expire_date'  => time() + 365 * DAY_IN_SECONDS,
+			'type'         => 'standard',
+			'product_slug' => 'power-course',
+			'product_name' => 'Power Course',
+		];
+		$this->stub_http_request(
+			'power-partner-server/license-codes',
+			[
+				'response' => [ 'code' => 200, 'message' => 'OK' ],
+				'body'     => \wp_json_encode( $cloud_response_body ),
+				'headers'  => [],
+			]
+		);
+
+		$response = $this->rest_request_as_admin( 'GET', '/v2/powerhouse/lc' );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertIsArray( $data );
+
+		$found = null;
+		foreach ( $data as $item ) {
+			if ( isset( $item['product_slug'] ) && 'power-course' === $item['product_slug'] ) {
+				$found = $item;
+				break;
+			}
+		}
+
+		$this->assertNotNull( $found, '應有 power-course 授權資訊' );
+		$this->assertSame( 'activated', $found['post_status'], '重新驗證成功後 post_status 應為 activated' );
+
+		// 清理
+		\remove_all_filters( 'powerhouse_product_infos' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function GET_lc_CloudAPI_回傳_401_時_應清除授權狀態(): void {
+		// 建立假產品並設置 saved_code
+		$this->register_lc_product( 'power-course', 'Power Course' );
+		\update_option( LCBase::KEY, [ 'power-course' => 'INVALID-CODE' ] );
+
+		// Stub Cloud API：回傳 401
+		$this->stub_http_request(
+			'power-partner-server/license-codes',
+			[
+				'response' => [ 'code' => 401, 'message' => 'Unauthorized' ],
+				'body'     => \wp_json_encode( [ 'message' => '授權碼無效' ] ),
+				'headers'  => [],
+			]
+		);
+
+		$response = $this->rest_request_as_admin( 'GET', '/v2/powerhouse/lc' );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertIsArray( $data );
+
+		$found = null;
+		foreach ( $data as $item ) {
+			if ( isset( $item['product_slug'] ) && 'power-course' === $item['product_slug'] ) {
+				$found = $item;
+				break;
+			}
+		}
+
+		$this->assertNotNull( $found, '應有 power-course 授權資訊' );
+		$this->assertSame( '', $found['post_status'], 'CloudAPI 401 後 post_status 應為空字串' );
+
+		// 清理
+		\remove_all_filters( 'powerhouse_product_infos' );
+	}
 }

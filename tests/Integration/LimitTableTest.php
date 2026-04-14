@@ -9,6 +9,9 @@ declare( strict_types=1 );
 namespace Tests\Integration;
 
 use J7\Powerhouse\Domains\Limit\Utils\CreateTable;
+use J7\Powerhouse\Domains\Limit\Utils\MetaCRUD;
+use J7\Powerhouse\Domains\Limit\Models\GrantedItem;
+use J7\Powerhouse\Domains\Limit\Models\LifeCycle;
 
 /**
  * Class LimitTableTest
@@ -238,5 +241,298 @@ class LimitTableTest extends TestCase {
 
 		// 清理
 		$wpdb->delete( $table_name, [ 'post_id' => $post_id, 'user_id' => $user_id ] ); // phpcs:ignore
+	}
+
+	// ========== MetaCRUD Helper 測試 ==========
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function MetaCRUD_update_應寫入_expire_date_資料(): void {
+		CreateTable::create_itemmeta_table();
+
+		$post_id = $this->factory()->post->create();
+		$user_id = $this->factory()->user->create();
+
+		$result = MetaCRUD::update( $post_id, $user_id, 'expire_date', '2030-01-01 00:00:00' );
+
+		$this->assertNotFalse( $result, 'MetaCRUD::update 不應失敗' );
+
+		$value = MetaCRUD::get( $post_id, $user_id, 'expire_date', true );
+		$this->assertSame( '2030-01-01 00:00:00', $value, 'expire_date 應已儲存' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function MetaCRUD_update_重複呼叫_應更新而非新增(): void {
+		CreateTable::create_itemmeta_table();
+
+		$post_id = $this->factory()->post->create();
+		$user_id = $this->factory()->user->create();
+
+		MetaCRUD::update( $post_id, $user_id, 'expire_date', '2025-01-01 00:00:00' );
+		MetaCRUD::update( $post_id, $user_id, 'expire_date', '2030-12-31 00:00:00' );
+
+		$value = MetaCRUD::get( $post_id, $user_id, 'expire_date', true );
+		$this->assertSame( '2030-12-31 00:00:00', $value, '重複寫入應更新為最新值' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function MetaCRUD_delete_應刪除指定記錄(): void {
+		CreateTable::create_itemmeta_table();
+
+		$post_id = $this->factory()->post->create();
+		$user_id = $this->factory()->user->create();
+
+		MetaCRUD::update( $post_id, $user_id, 'expire_date', '2030-01-01 00:00:00' );
+		$delete_result = MetaCRUD::delete( $post_id, $user_id, 'expire_date' );
+
+		$this->assertNotFalse( $delete_result, '刪除不應失敗' );
+
+		$value = MetaCRUD::get( $post_id, $user_id, 'expire_date', true );
+		$this->assertSame( '', $value, '刪除後查詢應回傳空字串' );
+	}
+
+	// ========== GrantedItem 模型測試 ==========
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function GrantedItem_無記錄時_can_access_應為_false(): void {
+		CreateTable::create_itemmeta_table();
+
+		$post_id     = $this->factory()->post->create();
+		$user_id     = $this->factory()->user->create();
+		$granted_item = new GrantedItem( $post_id, $user_id );
+
+		$this->assertFalse( $granted_item->can_access, '無授權記錄時 can_access 應為 false' );
+	}
+
+	// ========== grant_limit_to_user helper 測試 ==========
+
+	/**
+	 * @test
+	 * @group happy
+	 *
+	 * 注意：expire_at=null 時存入空字串，查詢可能回傳 '' 或 null（依 MetaCRUD 實作）。
+	 * 重點是不拋例外且不回傳過期時間。
+	 */
+	public function grant_limit_to_user_應寫入_expire_date_到_itemmeta(): void {
+		CreateTable::create_itemmeta_table();
+
+		$post_id = $this->factory()->post->create();
+		$user_id = $this->factory()->user->create();
+
+		$this->grant_limit_to_user( $user_id, $post_id );
+
+		$value = MetaCRUD::get( $post_id, $user_id, 'expire_date', true );
+		// 無 expire_at 時 expire_date 應為 '' 或 null（永不到期的表示方式）
+		$this->assertTrue(
+			'' === $value || null === $value,
+			"無 expire_at 時 expire_date 應為空字串或 null，實際：" . var_export( $value, true )
+		);
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function grant_limit_to_user_有_expire_at_時_應儲存到期時間(): void {
+		CreateTable::create_itemmeta_table();
+
+		$post_id  = $this->factory()->post->create();
+		$user_id  = $this->factory()->user->create();
+		$expire   = new \DateTime( '2030-06-15 12:00:00' );
+
+		$this->grant_limit_to_user( $user_id, $post_id, 'course', $expire );
+
+		$value = MetaCRUD::get( $post_id, $user_id, 'expire_date', true );
+		$this->assertSame( '2030-06-15 12:00:00', $value, 'expire_date 應為指定到期時間' );
+	}
+
+	// ========== REST API 測試 — grant-users ==========
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function Limit_REST_端點_grant_users_應已被註冊(): void {
+		$this->assert_rest_route_registered( '/v2/powerhouse/limit/grant-users' );
+	}
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function Limit_REST_端點_revoke_users_應已被註冊(): void {
+		$this->assert_rest_route_registered( '/v2/powerhouse/limit/revoke-users' );
+	}
+
+	/**
+	 * 以管理員身份發送 form-data POST（用於使用 get_body_params() 的 API）
+	 *
+	 * @param string               $route  路由
+	 * @param array<string, mixed> $params 請求參數
+	 * @return \WP_REST_Response
+	 */
+	private function limit_form_post_as_admin( string $route, array $params = [] ): \WP_REST_Response {
+		$admin_id = $this->factory()->user->create( [ 'role' => 'administrator' ] );
+		\wp_set_current_user( $admin_id );
+
+		$request = new \WP_REST_Request( 'POST', $route );
+		$request->set_body_params( $params );
+
+		/** @var \WP_REST_Response $response */
+		$response = \rest_do_request( $request );
+		return $response;
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function grant_users_缺少_user_ids_應回傳_4xx_或_5xx(): void {
+		$response = $this->limit_form_post_as_admin(
+			'/v2/powerhouse/limit/grant-users',
+			[
+				'item_ids'    => [ '201' ],
+				'expire_date' => '1800000000',
+			]
+		);
+
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), '缺少 user_ids 應回傳錯誤' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function grant_users_空_user_ids_應回傳_500(): void {
+		$response = $this->limit_form_post_as_admin(
+			'/v2/powerhouse/limit/grant-users',
+			[
+				'user_ids'    => [],
+				'item_ids'    => [ '201' ],
+				'expire_date' => '1800000000',
+			]
+		);
+
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), '空 user_ids 應回傳錯誤' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function grant_users_成功授權_應回傳_200_且寫入_itemmeta(): void {
+		CreateTable::create_itemmeta_table();
+
+		$user_id = $this->factory()->user->create();
+		$post_id = $this->factory()->post->create();
+
+		$response = $this->limit_form_post_as_admin(
+			'/v2/powerhouse/limit/grant-users',
+			[
+				'user_ids'    => [ (string) $user_id ],
+				'item_ids'    => [ (string) $post_id ],
+				'expire_date' => '1800000000',
+			]
+		);
+		$data = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertIsArray( $data );
+		$this->assertSame( 'grant_users_success', $data['code'], '授權應回傳 grant_users_success' );
+
+		// 確認 itemmeta 已寫入
+		$value = MetaCRUD::get( $post_id, $user_id, 'expire_date', true );
+		$this->assertSame( '1800000000', $value, 'expire_date 應已寫入 itemmeta' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function grant_users_成功後_應觸發_after_grant_action(): void {
+		CreateTable::create_itemmeta_table();
+
+		$user_id    = $this->factory()->user->create();
+		$post_id    = $this->factory()->post->create();
+		$fired_args = [];
+
+		// 監聽 action
+		\add_action(
+			LifeCycle::GRANT_USER_TO_ITEM_ACTION,
+			function ( int $uid, int $pid, mixed $expire ) use ( &$fired_args ): void {
+				$fired_args[] = [ 'user_id' => $uid, 'post_id' => $pid, 'expire_date' => $expire ];
+			},
+			10,
+			4
+		);
+
+		$this->limit_form_post_as_admin(
+			'/v2/powerhouse/limit/grant-users',
+			[
+				'user_ids'    => [ (string) $user_id ],
+				'item_ids'    => [ (string) $post_id ],
+				'expire_date' => '1800000000',
+			]
+		);
+
+		$this->assertNotEmpty( $fired_args, 'after_grant action 應已被觸發' );
+		$this->assertSame( $user_id, $fired_args[0]['user_id'] );
+		$this->assertSame( $post_id, $fired_args[0]['post_id'] );
+	}
+
+	// ========== REST API 測試 — revoke-users ==========
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function revoke_users_成功撤銷_應回傳_200(): void {
+		CreateTable::create_itemmeta_table();
+
+		$user_id = $this->factory()->user->create();
+		$post_id = $this->factory()->post->create();
+
+		// 先授權
+		MetaCRUD::update( $post_id, $user_id, 'expire_date', '1800000000' );
+
+		$response = $this->limit_form_post_as_admin(
+			'/v2/powerhouse/limit/revoke-users',
+			[
+				'user_ids' => [ (string) $user_id ],
+				'item_ids' => [ (string) $post_id ],
+			]
+		);
+		$data = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertIsArray( $data );
+		$this->assertSame( 'revoke_users_success', $data['code'], '撤銷應回傳 revoke_users_success' );
+	}
+
+	/**
+	 * @test
+	 * @group error
+	 */
+	public function revoke_users_空_user_ids_應回傳_5xx(): void {
+		$response = $this->limit_form_post_as_admin(
+			'/v2/powerhouse/limit/revoke-users',
+			[
+				'user_ids' => [],
+				'item_ids' => [ '201' ],
+			]
+		);
+
+		$this->assertGreaterThanOrEqual( 400, $response->get_status(), '空 user_ids 撤銷應回傳錯誤' );
 	}
 }

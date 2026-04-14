@@ -73,6 +73,8 @@ abstract class TestCase extends \WP_UnitTestCase {
 	 * 清理（每個測試後執行）
 	 */
 	public function tear_down(): void {
+		// 移除所有 HTTP request stubs
+		$this->remove_http_stubs();
 		// 清除可能存在的 LC transients
 		$this->clean_lc_transients();
 		parent::tear_down();
@@ -121,7 +123,103 @@ abstract class TestCase extends \WP_UnitTestCase {
 		return Settings::instance();
 	}
 
+	// ========== HTTP Stub Helper ==========
+
+	/**
+	 * 攔截符合 URL pattern 的 HTTP 請求，回傳假 response
+	 * 使用 pre_http_request filter 攔截 wp_remote_get/post 等 HTTP 函式
+	 *
+	 * @param string               $url_pattern URL 部分字串（使用 str_contains 比對）
+	 * @param array<string, mixed> $response    假 response，格式同 wp_remote_get 回傳值
+	 *                                           例：['response' => ['code' => 200, 'message' => 'OK'], 'body' => '{"key":"value"}']
+	 */
+	protected function stub_http_request( string $url_pattern, array $response ): void {
+		\add_filter(
+			'pre_http_request',
+			/**
+			 * @param false|array<string, mixed>|\WP_Error $preempt
+			 * @param array<string, mixed>                 $args
+			 * @param string                               $url
+			 * @return false|array<string, mixed>|\WP_Error
+			 */
+			function ( $preempt, array $args, string $url ) use ( $url_pattern, $response ) {
+				if ( str_contains( $url, $url_pattern ) ) {
+					return $response;
+				}
+				return $preempt;
+			},
+			10,
+			3
+		);
+	}
+
+	/**
+	 * 移除所有 HTTP request stubs
+	 * 應在 tear_down() 中呼叫，防止測試間污染
+	 */
+	protected function remove_http_stubs(): void {
+		\remove_all_filters( 'pre_http_request' );
+	}
+
 	// ========== LC (License Code) Helper ==========
+
+	/**
+	 * 透過 powerhouse_product_infos filter 動態註冊假產品資訊
+	 * LC 系統依賴此 filter 來識別受保護的產品
+	 *
+	 * @param string $product_slug 產品 slug（唯一識別符）
+	 * @param string $product_name 產品名稱（可選，預設使用 slug 生成）
+	 * @return array{slug: string, name: string} 已註冊的產品資訊
+	 */
+	protected function register_lc_product( string $product_slug, string $product_name = '' ): array {
+		if ( '' === $product_name ) {
+			$product_name = "Test Product {$product_slug}";
+		}
+
+		$product_info = [
+			'slug' => $product_slug,
+			'name' => $product_name,
+		];
+
+		\add_filter(
+			'powerhouse_product_infos',
+			/**
+			 * @param array<string, array{name?: string, link?: string}> $products
+			 * @return array<string, array{name?: string, link?: string}>
+			 */
+			static function ( array $products ) use ( $product_slug, $product_name ): array {
+				$products[ $product_slug ] = [ 'name' => $product_name ];
+				return $products;
+			}
+		);
+
+		return $product_info;
+	}
+
+	/**
+	 * 賦予用戶對特定 item 的存取權限（直接寫入 DB，測試專用）
+	 * 使用 Limit domain 的 MetaCRUD 寫入 ph_access_itemmeta 資料表
+	 *
+	 * @param int            $user_id   用戶 ID
+	 * @param int            $item_id   項目 ID（課程 ID 等）
+	 * @param string         $type      類型（預設 'course'，目前未使用，保留供擴充）
+	 * @param \DateTime|null $expire_at 到期時間（null = 永不到期，存空字串）
+	 */
+	protected function grant_limit_to_user( int $user_id, int $item_id, string $type = 'course', ?\DateTime $expire_at = null ): void {
+		// 確保資料表已建立
+		\J7\Powerhouse\Domains\Limit\Utils\CreateTable::create_itemmeta_table();
+
+		$expire_value = null !== $expire_at
+			? $expire_at->format( 'Y-m-d H:i:s' )
+			: '';
+
+		\J7\Powerhouse\Domains\Limit\Utils\MetaCRUD::update(
+			$item_id,
+			$user_id,
+			'expire_date',
+			$expire_value
+		);
+	}
 
 	/**
 	 * 為指定產品設定假的已啟用 LC transient
