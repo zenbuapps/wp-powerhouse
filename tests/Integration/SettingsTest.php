@@ -193,4 +193,94 @@ class SettingsTest extends TestCase {
 		$this->assertIsArray( $settings->api_booster_rules );
 		$this->assertEmpty( $settings->api_booster_rules );
 	}
+
+	// ========== 🔀 邊緣案例補洞 ==========
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function partial_update_陣列型欄位應能儲存(): void {
+		$settings = Settings::instance();
+		$settings->partial_update(
+			[
+				'email_domain_check_white_list' => [ 'custom.com', 'test.io' ],
+			]
+		);
+
+		$this->reset_settings_singleton();
+		$updated = Settings::instance();
+
+		$this->assertContains( 'custom.com', $updated->email_domain_check_white_list );
+		$this->assertContains( 'test.io', $updated->email_domain_check_white_list );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function partial_update_布林型字串應保持為_yes_或_no(): void {
+		$settings = Settings::instance();
+		$settings->partial_update( [ 'delay_email' => 'no' ] );
+
+		$this->reset_settings_singleton();
+		$updated = Settings::instance();
+
+		$this->assertSame( 'no', $updated->delay_email );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function singleton_reset_後_應重新從_option_讀取(): void {
+		$settings = Settings::instance();
+		$this->assertSame( 'yes', $settings->delay_email );
+
+		// 直接修改 option
+		\update_option(
+			Settings::SETTINGS_KEY,
+			[ 'delay_email' => 'no' ]
+		);
+
+		// 沒 reset 不會讀到新值
+		$stale = Settings::instance();
+		$this->assertSame( 'yes', $stale->delay_email, 'singleton 未 reset 時應保持快取' );
+
+		// reset 後應讀到新值
+		$this->reset_settings_singleton();
+		$fresh = Settings::instance();
+		$this->assertSame( 'no', $fresh->delay_email );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function partial_update_多個欄位應同時生效(): void {
+		$settings = Settings::instance();
+		$settings->partial_update(
+			[
+				'enable_captcha_login'    => 'yes',
+				'enable_captcha_register' => 'yes',
+				'delay_email'             => 'no',
+			]
+		);
+
+		$this->reset_settings_singleton();
+		$updated = Settings::instance();
+
+		$this->assertSame( 'yes', $updated->enable_captcha_login );
+		$this->assertSame( 'yes', $updated->enable_captcha_register );
+		$this->assertSame( 'no', $updated->delay_email );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function Settings_enable_theme_changer_預設應為_no(): void {
+		$settings = Settings::instance();
+		$this->assertSame( 'no', $settings->enable_theme_changer );
+	}
 }

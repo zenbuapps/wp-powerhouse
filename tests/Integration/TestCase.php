@@ -376,6 +376,18 @@ abstract class TestCase extends \WP_UnitTestCase {
 		return $response;
 	}
 
+	// ========== Subscription Helper ==========
+
+	/**
+	 * 若 WC Subscriptions 未安裝則整個測試 skip
+	 * Subscription 相關測試必須在前置呼叫此方法
+	 */
+	protected function skipIfSubscriptionsMissing(): void {
+		if ( ! class_exists( '\WC_Subscriptions' ) && ! function_exists( 'wcs_create_subscription' ) ) {
+			$this->markTestSkipped( 'WooCommerce Subscriptions 未安裝' );
+		}
+	}
+
 	// ========== 斷言 Helper ==========
 
 	/**

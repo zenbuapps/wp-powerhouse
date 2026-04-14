@@ -1,4 +1,31 @@
 <?xml version="1.0"?>
+<!--
+    Powerhouse PHPUnit Configuration
+
+    測試群組分類（雙層標記）：
+    Category groups（每個測試方法至少一個）：
+        smoke    = 冒煙測試（路由註冊、singleton 可建立）
+        happy    = 快樂路徑
+        error    = 錯誤處理
+        edge     = 邊緣案例
+        security = 安全性
+
+    Domain groups（class-level，用以篩選測試檔）：
+        post-api, user-api, term-api, product-variation-api,
+        product-attribute-api, order-api, cloud-api, subscription,
+        misc, admin, captcha, email, theme, register, settings,
+        license-code, limit-table, dto, infrastructure, mu-plugin
+
+    預設僅跑 smoke/happy/error/edge/security 五大 category。
+    subscription / infrastructure / mu-plugin 等特殊 domain 需顯式 指定。
+
+    常用命令：
+        vendor/bin/phpunit                               (預設 5 大 category)
+        vendor/bin/phpunit group=smoke group=happy       (僅冒煙 + 快樂)
+        vendor/bin/phpunit group=user-api                (單一 domain)
+        vendor/bin/phpunit group=subscription            (WC Subs 專用)
+        vendor/bin/phpunit coverage-html=build/coverage  (覆蓋率報告)
+-->
 <phpunit
     bootstrap="tests/bootstrap.php"
     backupGlobals="false"
@@ -22,6 +49,20 @@
             <group>security</group>
         </include>
     </groups>
+
+    <coverage processUncoveredFiles="false">
+        <include>
+            <directory suffix=".php">./inc/classes</directory>
+        </include>
+        <exclude>
+            <directory>./inc/classes/Compatibility/mu-plugins</directory>
+            <file>./inc/classes/Plugin.php</file>
+        </exclude>
+        <report>
+            <html outputDirectory="build/coverage" lowUpperBound="50" highLowerBound="90"/>
+            <text outputFile="build/coverage.txt" showUncoveredFiles="false"/>
+        </report>
+    </coverage>
 
     <php>
         <env name="WP_PHPUNIT__TESTS_CONFIG" value="tests/wp-tests-config.php"/>
