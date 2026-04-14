@@ -1,0 +1,24 @@
+@ignore @event
+Feature: 試用結束事件
+
+  Background:
+    Given Powerhouse 外掛已啟用
+    And WooCommerce Subscriptions 已啟用
+
+  Rule: 後置（狀態）- 試用期結束時觸發 powerhouse_subscription_at_trial_end action
+
+    Example: 訂閱試用期結束時分發事件
+      Given 一個 WC_Subscription 已建立且設有試用期
+      When WooCommerce 排程觸發 woocommerce_scheduled_subscription_trial_end hook
+      And 傳入的 subscription_id 對應有效的 WC_Subscription
+      Then 系統分發 powerhouse_subscription_at_trial_end action
+      And action 第一個參數為 $subscription 物件
+      And action 第二個參數為空陣列 []
+
+  Rule: 前置（狀態）- subscription_id 無效時不觸發
+
+    Example: subscription_id 無法取得有效訂閱時不觸發
+      Given woocommerce_scheduled_subscription_trial_end hook 被觸發
+      And wcs_get_subscription 回傳 false（訂閱不存在）
+      When 系統嘗試處理事件
+      Then 系統不分發 powerhouse_subscription_at_trial_end action

@@ -1,0 +1,109 @@
+[ACTIVITY] 管理後台
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 系統 -> {specs/actors/系統.md}
+
+# ============================================================
+# Bootstrap 外掛初始化
+# ============================================================
+
+[STEP:1] @系統 {features/admin/外掛初始化.feature}
+# Bootstrap::instance() 於 Powerhouse\Plugin callback（priority -10）建構
+# 初始化所有子系統、註冊 admin menu、資源 enqueue、授權碼檢查等
+[DECISION:1a] WooCommerce 是否啟用
+  [BRANCH:1a:啟用] @系統 額外載入 Compatibility\Services\Scheduler / Admin\Debug / Admin\OrderList / Admin\Account / Admin\DelayEmail
+  [BRANCH:1a:未啟用] @系統 僅載入核心子系統（Admin\Entry、Api\Base、Api\LC、Domains\Loader、Theme、Captcha）
+[MERGE:1a]
+[DECISION:1b] 是否有註冊 powerhouse_product_infos
+  [BRANCH:1b:有] @系統 在 admin menu 新增「授權碼」子選單（admin.php?page=powerhouse#license-code）
+  [BRANCH:1b:無] @系統 只顯示「設定」子選單
+[MERGE:1b]
+[DECISION:1c] admin_enqueue_scripts URL 判斷
+  [BRANCH:1c:非power-/powerhouse URL] @系統 不載入任何後台資源
+  [BRANCH:1c:power-/powerhouse URL] @系統 載入 admin.min.css + antd-toolkit style.css
+  [BRANCH:1c:powerhouse toplevel 頁] @系統 另外載入 React SPA（Vite\enqueue_asset main.tsx）+ 加密環境變數（NONCE、API_URL、ROLES 等）
+[MERGE:1c]
+[DECISION:1d] Plugin::$env === 'local' 且 script handle 匹配
+  [BRANCH:1d:yes] @系統 修正 script src 路徑（C:/.../apps → plugins）
+  [BRANCH:1d:no] @系統 原樣回傳
+[MERGE:1d]
+
+# ============================================================
+# 管理後台 SPA 入口
+# ============================================================
+
+[STEP:2] @管理員 進入 WordPress 後台 toplevel「Powerhouse」選單
+[STEP:3] @系統 {features/admin/管理後台入口.feature}
+# Admin\Entry 於 current_screen hook 偵測 toplevel_page_powerhouse
+# 呼叫 Base::render_admin_layout 渲染 React SPA 掛載容器後 exit
+[DECISION:3a] current_screen 判斷
+  [BRANCH:3a:toplevel_page_powerhouse] @系統 呼叫 Bootstrap::enqueue_admin_assets + Base::render_admin_layout（title: "Powerhouse 後台 | {blog_name}"）→ exit
+  [BRANCH:3a:其他頁面] @系統 不攔截，讓 WordPress 繼續預設流程
+[MERGE:3a]
+
+# ============================================================
+# Debug 工具（條件：WooCommerce 啟用）
+# ============================================================
+
+[STEP:4] @管理員 從 Admin Bar 點擊 Logs 快捷選單
+[STEP:5] @系統 {features/admin/Debug工具.feature}
+[DECISION:5a] 當前用戶權限
+  [BRANCH:5a:manage_options] @系統 在 Admin Bar 顯示 Logs 主節點 + WC Logger + Debug Log 子節點
+  [BRANCH:5a:無權限] @系統 不顯示任何 Admin Bar 節點
+[MERGE:5a]
+[DECISION:5b] tools.php 子選單狀態
+  [BRANCH:5b:已有 debug-log-viewer] @系統 不重複註冊
+  [BRANCH:5b:未註冊] @系統 add_submenu_page 新增 Debug Log Viewer（position 1000）
+[MERGE:5b]
+
+[STEP:6] @管理員 進入 tools.php?page=debug-log-viewer 檢視 debug log
+[STEP:7] @系統 讀取 debug.log 最後 1000 行，以 nl2br + esc_html 輸出
+[DECISION:7a] debug.log 檔案狀態
+  [BRANCH:7a:存在且可讀] @系統 顯示內容
+  [BRANCH:7a:存在但無法讀取] @系統 顯示 "Error reading log file."
+  [BRANCH:7a:不存在] @系統 顯示 "Log file does not exist."
+[MERGE:7a]
+
+[STEP:8] @管理員 點擊「刪除 debug.log」按鈕
+[STEP:9] @系統 admin_post_delete_debug_log 驗證權限與 nonce
+[DECISION:9a] 權限 + nonce 驗證
+  [BRANCH:9a:無權限] @系統 wp_die('權限不足')
+  [BRANCH:9a:nonce 無效] @系統 wp_die('無效的請求')
+  [BRANCH:9a:通過] @系統 unlink debug.log → redirect 回原頁（帶 deleted=1 或 deleted=0）
+[MERGE:9a]
+
+# ============================================================
+# Account 姓氏非必填（條件：WooCommerce 啟用）
+# ============================================================
+
+[STEP:10] @系統 {features/admin/管理員帳號.feature}
+[DECISION:10a] Settings->last_name_optional
+  [BRANCH:10a:yes] @系統 掛載 woocommerce_save_account_details_required_fields filter，移除 account_last_name
+  [BRANCH:10a:no] @系統 不掛載 filter
+[MERGE:10a]
+
+# ============================================================
+# 訂單列表頁強化（條件：WooCommerce 啟用）
+# ============================================================
+
+[STEP:11] @管理員 進入 WooCommerce 訂單列表
+[STEP:12] @系統 {features/admin/訂單列表頁強化.feature}
+[DECISION:12a] HPOS 啟用狀態
+  [BRANCH:12a:HPOS 啟用] @系統 掛載 manage_woocommerce_page_wc-orders_columns + manage_woocommerce_page_wc-orders_custom_column
+  [BRANCH:12a:HPOS 停用] @系統 掛載 manage_edit-shop_order_columns + manage_shop_order_posts_custom_column
+[MERGE:12a]
+[DECISION:12b] 訂單項目類型
+  [BRANCH:12b:line_item] @系統 輸出 <a href="{edit_link}">{product_name}</a> x {quantity}
+  [BRANCH:12b:非 line_item 或無商品] @系統 略過
+[MERGE:12b]
+
+# ============================================================
+# 訂單詳情頁強化（目前停用）
+# ============================================================
+
+[STEP:13] @系統 {features/admin/訂單詳情頁強化.feature}
+# NOTE: Bootstrap 中 Admin\OrderDetail::instance() 已被註解
+# 已知 BUG：經典編輯器在非 HPOS 模式下無法正常顯示
+[DECISION:13a] 實際載入狀態
+  [BRANCH:13a:當前停用] @系統 不替換 WooCommerce 預設訂單備註 meta box
+  [BRANCH:13a:若啟用（僅記錄設計意圖）] @系統 移除原生 meta box → 加入含 TinyMCE 經典編輯器的自訂 meta box
+[MERGE:13a]

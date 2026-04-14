@@ -1,0 +1,40 @@
+[ACTIVITY] 系統保護
+[ACTOR] 系統 -> {specs/actors/系統.md}
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 用戶 -> {specs/actors/用戶.md}
+[ACTOR] WooCommerce -> {specs/actors/WooCommerce.md}
+
+[STEP:1] @系統 驗證碼保護 — 登入
+[DECISION:1a] 登入驗證碼啟用？
+  [BRANCH:1a:enable_captcha_login=yes] @用戶 {features/captcha/登入驗證碼.feature}
+    [DECISION:1a1] 用戶角色是否在 captcha_role_list？
+      [BRANCH:1a1:是] @系統 顯示驗證碼、驗證輸入
+      [BRANCH:1a1:否] @系統 直接允許登入，不顯示驗證碼
+    [MERGE:1a1]
+  [BRANCH:1a:enable_captcha_login=no] @系統 不掛載驗證碼邏輯，正常登入流程
+[MERGE:1a]
+
+[STEP:2] @系統 驗證碼保護 — 註冊
+[DECISION:2a] 註冊驗證碼啟用？
+  [BRANCH:2a:enable_captcha_register=yes] @用戶 {features/captcha/註冊驗證碼.feature}
+  [BRANCH:2a:enable_captcha_register=no] @系統 不掛載驗證碼邏輯，正常註冊流程
+[MERGE:2a]
+
+[STEP:3] @系統 Email 網域驗證
+[DECISION:3a] 載入來源
+  [BRANCH:3a:mu-plugin 已載入] @系統 由 mu-plugin 提供 EmailValidator
+  [BRANCH:3a:mu-plugin 未載入] @系統 {features/register/註冊Email過濾.feature} fallback 載入
+[MERGE:3a]
+[DECISION:3b] 驗證時機
+  [BRANCH:3b:註冊時（enable_email_domain_check_register=yes）] @系統 {features/email/Email網域驗證.feature} 檢查註冊 Email 網域
+  [BRANCH:3b:發信時（enable_email_domain_check_wp_mail=yes）] @系統 {features/email/Email網域驗證.feature} 檢查收件人 Email 網域
+[MERGE:3b]
+
+[STEP:4] @WooCommerce Email 延遲發送
+[DECISION:4a] 延遲發信啟用？
+  [BRANCH:4a:delay_email=yes] @系統 {features/email/延遲發送Email.feature}
+    [STEP:4a1] @系統 移除 WC Email 同步觸發
+    [STEP:4a2] @系統 訂單狀態變更時 as_enqueue_async_action
+    [STEP:4a3] @系統 Action Scheduler 非同步觸發 Email 發送
+  [BRANCH:4a:delay_email=no] @WooCommerce 維持原始同步發送
+[MERGE:4a]

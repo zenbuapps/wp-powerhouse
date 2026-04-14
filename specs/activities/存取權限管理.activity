@@ -1,0 +1,44 @@
+[ACTIVITY] 存取權限管理
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 系統 -> {specs/actors/系統.md}
+[ACTOR] WooCommerce -> {specs/actors/WooCommerce.md}
+[ACTOR] 子外掛 -> {specs/actors/子外掛.md}
+
+# ----- 資料表建立（系統層） -----
+
+[STEP:0] @系統 {features/limit/建立存取權限資料表.feature}
+# 外掛啟用時或 Compatibility Scheduler 執行時建立 ph_access_itemmeta 表
+
+# ----- 商品綁定項目（管理員 CRUD） -----
+
+[STEP:1] @管理員 {features/product/綁定權限項目到商品.feature}
+
+[STEP:2] @管理員 {features/product/更新綁定權限.feature}
+
+[STEP:3] @管理員 {features/product/解除綁定權限項目.feature}
+
+# ----- 授權路徑（管理員手動 vs 子外掛自動） -----
+
+[STEP:4] @管理員 {features/limit/授權用戶存取.feature}
+[DECISION:4a] 授權觸發來源
+  [BRANCH:4a:管理員手動授權] @管理員 透過 REST API POST /v2/powerhouse/limit/grant-users 觸發 grant_user_to_item action
+  [BRANCH:4a:子外掛自動授權] @子外掛 於訂單完成 hook 中透過 BoundItemData->grant_user() 或 do_action('powerhouse/limit/grant_user_to_item') 觸發
+[MERGE:4a]
+
+[STEP:4b] @系統 {features/limit/LifeCycle授權行為.feature}
+# LifeCycle 監聽 action hook，將資料寫入 ph_access_itemmeta 表
+
+[STEP:4c] @系統 {features/limit/BoundItemData授權原語.feature}
+# 下游外掛可直接呼叫 BoundItemData->grant_user 的授權原語，支援 follow_subscription 模式
+
+# ----- 更新存取期限 -----
+
+[STEP:5] @管理員 {features/limit/更新用戶存取期限.feature}
+
+# ----- 撤銷路徑 -----
+
+[STEP:6] @管理員 {features/limit/撤銷用戶存取.feature}
+[DECISION:6a] 撤銷觸發來源
+  [BRANCH:6a:管理員手動撤銷] @管理員 透過 REST API POST /v2/powerhouse/limit/revoke-users 觸發 after_revoke_user_from_item action
+  [BRANCH:6a:子外掛自動撤銷] @子外掛 於訂閱失敗 / 退款 hook 中透過 BoundItemData->revoke_user() 或 do_action('powerhouse/limit/after_revoke_user_from_item') 觸發
+[MERGE:6a]

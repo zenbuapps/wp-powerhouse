@@ -1,0 +1,76 @@
+[ACTIVITY] 基礎設施
+[ACTOR] 系統 -> {specs/actors/系統.md}
+[ACTOR] 管理員 -> {specs/actors/管理員.md}
+[ACTOR] 子外掛 -> {specs/actors/子外掛.md}
+
+# ============================================================
+# mu-plugins 系統級服務
+# ============================================================
+
+[STEP:1] @系統 {features/mu-plugin/Powerhouse載入器.feature}
+[DECISION:1a] vendor/autoload.php 是否存在
+  [BRANCH:1a:存在] @系統 require_once vendor/autoload.php，預載入核心 Trait/Class
+  [BRANCH:1a:不存在] @系統 靜默跳過，WordPress 繼續正常載入
+[MERGE:1a]
+
+[STEP:2] @系統 {features/mu-plugin/API加速器.feature}
+[DECISION:2a] 請求 URL 是否匹配 api_booster_rules
+  [BRANCH:2a:匹配] @系統 覆寫 active_plugins，僅載入規則指定的外掛
+  [BRANCH:2a:未匹配] @系統 維持原有 active_plugins
+[MERGE:2a]
+
+[STEP:3] @系統 {features/mu-plugin/停用WordPress功能.feature}
+# 停用 XML-RPC、移除 REST API users 端點、移除中間圖片尺寸生成
+
+[STEP:4] @系統 {features/mu-plugin/Email網域驗證器.feature}
+[DECISION:4a] 驗證範圍
+  [BRANCH:4a:enable_email_domain_check_register=yes] @系統 註冊時驗證 Email 網域 MX
+  [BRANCH:4a:enable_email_domain_check_wp_mail=yes] @系統 wp_mail 前驗證收件者網域
+  [BRANCH:4a:皆停用] @系統 不註冊任何 filter
+[MERGE:4a]
+[DECISION:4b] Email 是否在白名單
+  [BRANCH:4b:在白名單] @系統 跳過 MX 檢查，直接通過
+  [BRANCH:4b:不在白名單] @系統 進行 dns_get_mx 檢查
+[MERGE:4b]
+
+# ============================================================
+# Theme 主題系統
+# ============================================================
+
+[STEP:5] @系統 {features/theme/主題色彩系統.feature}
+[DECISION:5a] enable_theme 設定
+  [BRANCH:5a:yes] @系統 注入 data-theme HTML 屬性 + wp_head 注入 CSS 變數
+  [BRANCH:5a:no] @系統 不注入主題相關 HTML/CSS
+[MERGE:5a]
+
+[STEP:6] @系統 {features/theme/主題CSS注入.feature}
+[DECISION:6a] enable_theme_changer 設定
+  [BRANCH:6a:yes] @系統 注入 localStorage 同步腳本 + 渲染主題切換按鈕
+  [BRANCH:6a:no] @系統 僅注入 CSS 變數，不顯示切換器
+[MERGE:6a]
+
+# ============================================================
+# Infrastructure 其他基礎設施
+# ============================================================
+
+[STEP:7] @系統 {features/infrastructure/訊息範本.feature}
+# 註冊 ph_message_tpl CPT，提供 MessageTemplateDTO 給子外掛使用
+
+[STEP:8] @管理員 {features/infrastructure/自動更新.feature}
+[DECISION:8a] 系統環境
+  [BRANCH:8a:local] @系統 使用測試外掛（classic-editor）避免意外更新
+  [BRANCH:8a:production] @系統 偵測 power-* 外掛，更新時觸發 Powerhouse 自動更新
+[MERGE:8a]
+[DECISION:8b] 自動更新執行結果
+  [BRANCH:8b:有可用更新] @系統 Plugin_Upgrader::upgrade -> activate_plugin
+  [BRANCH:8b:無可用更新] @系統 記錄 error log 「沒有可用的更新」
+  [BRANCH:8b:更新失敗] @系統 記錄錯誤訊息，不啟用外掛
+  [BRANCH:8b:例外] @系統 記錄「自動更新失敗」例外訊息
+[MERGE:8b]
+
+[STEP:9] @系統 {features/infrastructure/非同步任務處理.feature}
+# AsSchedulerHandler\Shared\Base 抽象基底類別，提供統一的 Action Scheduler 排程介面
+[DECISION:9a] 排程類型
+  [BRANCH:9a:single] @系統 schedule_single 建立一次性排程
+  [BRANCH:9a:recurring] @系統 schedule_recurring 建立週期性排程
+[MERGE:9a]

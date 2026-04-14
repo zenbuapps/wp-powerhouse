@@ -1,0 +1,56 @@
+[ACTIVITY] 訂閱管理
+[ACTOR] 系統 -> {specs/actors/系統.md}
+[ACTOR] WooCommerce -> {specs/actors/WooCommerce.md}
+[ACTOR] 子外掛 -> {specs/actors/子外掛.md}
+
+[STEP:1] @WooCommerce {features/subscription/訂閱建立事件.feature}
+
+[STEP:2] @WooCommerce {features/subscription/首次付款成功事件.feature}
+[DECISION:2a] 關聯訂單數量
+  [BRANCH:2a:僅一筆且為 parent order] @系統 分發 powerhouse_subscription_at_initial_payment_complete action
+  [BRANCH:2a:多筆訂單（含續訂）] @系統 不觸發，避免續訂時重複觸發
+  [BRANCH:2a:唯一訂單 ID 與 parent order ID 不符] @系統 不觸發
+[MERGE:2a]
+
+[STEP:3] @WooCommerce {features/subscription/訂閱失敗事件.feature}
+[DECISION:3a] 狀態轉變方向
+  [BRANCH:3a:從非失敗狀態轉為失敗狀態（cancelled/expired）] @系統 分發 powerhouse_subscription_at_subscription_failed action
+  [BRANCH:3a:原本已是失敗狀態] @系統 不觸發
+  [BRANCH:3a:轉為非失敗狀態（on-hold/pending-cancel）] @系統 不觸發
+[MERGE:3a]
+
+[STEP:4] @WooCommerce {features/subscription/訂閱恢復成功事件.feature}
+[DECISION:4a] 狀態轉變方向
+  [BRANCH:4a:從失敗狀態（cancelled/expired）轉為 active] @系統 分發 powerhouse_subscription_at_subscription_success action
+  [BRANCH:4a:從非失敗狀態轉變] @系統 不觸發
+  [BRANCH:4a:轉為非 active 狀態] @系統 不觸發
+[MERGE:4a]
+
+[STEP:5] @WooCommerce {features/subscription/試用結束事件.feature}
+
+[STEP:6] @WooCommerce {features/subscription/下次付款事件.feature}
+
+[STEP:7] @WooCommerce {features/subscription/續訂訂單建立事件.feature}
+
+[STEP:8] @WooCommerce {features/subscription/付款重試事件.feature}
+[DECISION:8a] 訂單與訂閱解析
+  [BRANCH:8a:order_id 對應有效訂單且關聯訂閱存在] @系統 分發 powerhouse_subscription_at_payment_retry action，參數含 order
+  [BRANCH:8a:order_id 無效] @系統 不觸發
+  [BRANCH:8a:訂單無關聯訂閱] @系統 不觸發
+[MERGE:8a]
+
+[STEP:9] @WooCommerce {features/subscription/訂閱結束事件.feature}
+
+[STEP:10] @WooCommerce {features/subscription/預付期結束事件.feature}
+
+[STEP:11] @WooCommerce {features/subscription/監聽試用結束時間變化.feature}
+
+[STEP:12] @WooCommerce {features/subscription/監聽下次付款時間變化.feature}
+
+[STEP:13] @WooCommerce {features/subscription/監聽結束時間變化.feature}
+
+[STEP:14] @系統 {features/subscription/付款重試規則.feature}
+[DECISION:14a] 重試結果
+  [BRANCH:14a:3 次重試內付款成功] @WooCommerce 訂閱恢復 active -> 4
+  [BRANCH:14a:3 次重試皆失敗] @系統 訂閱轉為 cancelled 狀態 -> 3
+[MERGE:14a]
