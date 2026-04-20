@@ -205,6 +205,15 @@ abstract class CRUD {
 		// 分批處理資料
 		$batches = array_chunk($to_tree, $batch_size);
 
+		// 收集所有受影響的 ID，用於事務成功後清除 per-post object cache
+		// （避免 Redis / Memcached 等 persistent backend 下 group flush 不生效，
+		//  造成 get_post() 回 stale 值，同時確保 post_modified 反映在 cache 中）
+		$all_affected_ids = [];
+
+		// 排序操作的 post_modified 時間戳（整個批次統一為操作發起當下，一次性 prepare 為 %s）
+		$modified_local = \current_time('mysql', 0);
+		$modified_gmt   = \current_time('mysql', 1);
+
 		// 開始事務處理
 		$wpdb->query('START TRANSACTION');
 
@@ -229,8 +238,16 @@ abstract class CRUD {
 					$parent_cases[] = $wpdb->prepare('WHEN ID = %d THEN %d', $id, $parent_id);
 				}
 
+				// 合併入全部受影響 ID（後續 clean_post_cache 使用）
+				foreach ($ids as $affected_id) {
+					$all_affected_ids[ $affected_id ] = true;
+				}
+
 				// 構建ID列表
 				$id_list = implode(',', $ids);
+
+				// 準備 post_modified / post_modified_gmt 的 placeholder（整個批次統一值）
+				$modified_sql = $wpdb->prepare(', post_modified = %s, post_modified_gmt = %s ', $modified_local, $modified_gmt);
 
 				// 構建批量更新SQL
 				$sql  = "UPDATE {$wpdb->posts} SET menu_order = CASE ";
@@ -241,6 +258,9 @@ abstract class CRUD {
 				$sql .= ', post_parent = CASE ';
 				$sql .= implode(' ', $parent_cases);
 				$sql .= ' ELSE post_parent END ';
+
+				// 加入 post_modified / post_modified_gmt 更新（反映本次排序操作時間）
+				$sql .= $modified_sql;
 
 				// 加入WHERE條件，限制只更新需要的記錄
 				$sql .= " WHERE ID IN ($id_list)";
@@ -262,6 +282,14 @@ abstract class CRUD {
 			// 清除文章的中繼資料快取
 			\wp_cache_flush_group('post_meta');
 
+			// 額外清除每一筆受影響的 per-post object cache
+			// Redis / Memcached 等 persistent backend 在某些環境下
+			// `wp_cache_flush_group('posts')` 未必能讓 per-post entry 失效，
+			// 直接呼叫 clean_post_cache 確保 get_post() 後續能拿到
+			// 最新 menu_order / post_parent / post_modified。
+			foreach (array_keys($all_affected_ids) as $affected_id) {
+				\clean_post_cache( (int) $affected_id );
+			}
 		} catch (\Exception $e) {
 			// 回滾事務
 			$wpdb->query('ROLLBACK');
