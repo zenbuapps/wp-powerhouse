@@ -265,10 +265,10 @@ abstract class CRUD {
 	 *
 	 * @param int                  $user_id 用戶 ID
 	 * @param array<string, mixed> $args 查詢參數
-	 * @param int                  $format OBJECT or ARRAY_A
+	 * @param string               $format OBJECT or ARRAY_A
 	 * @return array<int, mixed>
 	 */
-	public static function get_user_orders( int $user_id, array $args = [], int $format = OBJECT ): array {
+	public static function get_user_orders( int $user_id, array $args = [], string $format = OBJECT ): array {
 		$default_args = [
 			'customer_id' => $user_id,
 			// 'status' => ['wc-processing', 'wc-on-hold'],
