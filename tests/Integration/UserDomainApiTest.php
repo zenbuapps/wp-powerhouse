@@ -72,14 +72,7 @@ class UserDomainApiTest extends TestCase {
 			]
 		);
 
-		// BUG: issue #6 — CRUD::get_user_orders 宣告 int $format 但 WP 常數 ARRAY_A 是字串
-		// 呼叫會拋 TypeError（非 WP_Error），修復後應回 200
-		try {
-			$response = $this->rest_request_as_admin( 'GET', "/v2/powerhouse/users/{$user_id}" );
-		} catch ( \TypeError $e ) {
-			$this->markTestSkipped( 'Blocked by issue #6: ' . $e->getMessage() );
-			return;
-		}
+		$response = $this->rest_request_as_admin( 'GET', "/v2/powerhouse/users/{$user_id}" );
 
 		$this->assertSame( 200, $response->get_status() );
 
@@ -230,13 +223,7 @@ class UserDomainApiTest extends TestCase {
 	 * @group error
 	 */
 	public function 取得不存在的用戶應回傳錯誤(): void {
-		try {
-			$response = $this->rest_request_as_admin( 'GET', '/v2/powerhouse/users/999999999' );
-		} catch ( \TypeError $e ) {
-			// BUG: issue #6 — get_user_orders TypeError
-			$this->markTestSkipped( 'Blocked by issue #6: ' . $e->getMessage() );
-			return;
-		}
+		$response = $this->rest_request_as_admin( 'GET', '/v2/powerhouse/users/999999999' );
 		$this->assertNotNull( $response );
 		$this->assertNotSame( 200, $response->get_status(), '不存在 ID 不應回 200' );
 	}
