@@ -1,6 +1,8 @@
 {
 	"core": "WordPress/WordPress#6.8",
 	"phpVersion": "8.2",
+	"port": 8898,
+	"testsPort": 8899,
 	"plugins": [
 		"https://downloads.wordpress.org/plugin/woocommerce.zip",
 		"."

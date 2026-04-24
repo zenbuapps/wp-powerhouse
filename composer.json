@@ -57,11 +57,11 @@
   },
   "scripts": {
     "lint": "phpcs",
-    "test": "phpunit --testsuite Integration",
-    "test:smoke": "phpunit --testsuite Integration --group smoke",
-    "test:happy": "phpunit --testsuite Integration --group happy",
-    "test:error": "phpunit --testsuite Integration --group error",
-    "test:edge": "phpunit --testsuite Integration --group edge"
+    "test": "phpunit --testsuite integration",
+    "test:smoke": "phpunit --testsuite integration --group smoke",
+    "test:happy": "phpunit --testsuite integration --group happy",
+    "test:error": "phpunit --testsuite integration --group error",
+    "test:edge": "phpunit --testsuite integration --group edge"
   },
   "conflict": {
     "symfony/finder": ">6.0.19"
