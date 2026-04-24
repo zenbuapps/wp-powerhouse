@@ -1260,8 +1260,20 @@ jobs:
         if: steps.run_ai_acceptance.outcome != 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
+          CLAUDE_BRANCH_NAME: ${{ needs.claude.outputs.branch_name }}
         run: |
+          # actions/checkout@v4 以 `ref: <branch>` checkout 時為 detached HEAD
+          # 因此 `git branch --show-current` 會回空字串，需從 claude job 的 output 取得
           CURRENT_BRANCH=$(git branch --show-current)
+          if [ -z "$CURRENT_BRANCH" ]; then
+            CURRENT_BRANCH="$CLAUDE_BRANCH_NAME"
+            echo "ℹ️ 目前為 detached HEAD，使用 claude job 傳遞的分支名稱：$CURRENT_BRANCH"
+          fi
+
+          if [ -z "$CURRENT_BRANCH" ]; then
+            echo "⚠️ 無法取得分支名稱，跳過 PR 建立"
+            exit 0
+          fi
 
           # 如果已經在 master，就沒有 PR 可開
           if [ "$CURRENT_BRANCH" = "master" ] || [ "$CURRENT_BRANCH" = "main" ]; then
@@ -1283,9 +1295,9 @@ jobs:
           # 重新設定 git 認證（claude-code-action 可能覆蓋了 checkout 的設定）
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
 
-          # 推送分支到遠端
+          # 推送分支到遠端（detached HEAD 也相容：用 HEAD:refs/heads/<branch> 的顯式寫法）
           echo "🔄 推送分支 $CURRENT_BRANCH 到遠端..."
-          if ! git push -u origin "$CURRENT_BRANCH"; then
+          if ! git push origin "HEAD:refs/heads/${CURRENT_BRANCH}"; then
             echo "❌ git push 失敗，無法建立 PR"
             exit 1
           fi
