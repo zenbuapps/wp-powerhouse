@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PLUGIN_SLUG: powerhouse
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Package plugin as zip
+        id: zip
+        run: |
+          SLUG="${PLUGIN_SLUG}"
+          TAG_NAME="${GITHUB_REF_NAME}"
+          ZIP_NAME="${SLUG}-${TAG_NAME}.zip"
+          STAGE_DIR="/tmp/${SLUG}"
+
+          mkdir -p "${STAGE_DIR}"
+          # 複製外掛所需檔案，排除開發檔案
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='tests' \
+            --exclude='specs' \
+            --exclude='release' \
+            --exclude='*.log' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='.vscode' \
+            --exclude='.idea' \
+            --exclude='.claude' \
+            --exclude='phpunit.xml.dist' \
+            --exclude='phpstan.neon' \
+            --exclude='phpcs.xml' \
+            --exclude='tsconfig.json' \
+            --exclude='vite.config.ts' \
+            --exclude='postcss.config.cjs' \
+            --exclude='tailwind.config*.cjs' \
+            --exclude='pnpm-lock.yaml' \
+            --exclude='package-lock.json' \
+            --exclude='yarn.lock' \
+            ./ "${STAGE_DIR}/"
+
+          cd /tmp
+          zip -r "${ZIP_NAME}" "${SLUG}" > /dev/null
+          echo "zip_path=/tmp/${ZIP_NAME}" >> "$GITHUB_OUTPUT"
+          echo "zip_name=${ZIP_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.zip.outputs.zip_path }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false

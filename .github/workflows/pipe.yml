@@ -23,7 +23,7 @@ jobs:
         (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 90
     env:
       GIT_AUTHOR_NAME: ${{ github.actor }}
       GIT_AUTHOR_EMAIL: ${{ github.actor }}@users.noreply.github.com
@@ -501,7 +501,7 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 75
     permissions:
       contents: write
       pull-requests: write

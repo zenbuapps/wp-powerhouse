@@ -19,6 +19,11 @@ name: Act Test (Multi-Job Structure Validation)
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: '僅供 act 本地使用，請輸入 yes 以確認執行'
+        required: true
+        type: string
 
 jobs:
   integration-tests:
@@ -30,7 +35,7 @@ jobs:
       phpunit_ok: ${{ steps.mock_phpunit.outcome }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: 設定 Node.js
         uses: actions/setup-node@v4
@@ -90,7 +95,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: 設定 Node.js
         uses: actions/setup-node@v4
