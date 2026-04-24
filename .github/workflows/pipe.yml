@@ -463,7 +463,7 @@ jobs:
 
           echo "📊 Clarifier: $CLARIFIER_OK | Planner: $PLANNER_OK | tdd-coordinator: $TDD_OK | FullAuto: $FULL_AUTO_MODE | PR: $PR_MODE | Pipeline: $PIPELINE_MODE"
 
-      # ── 兜底：確保所有 local commits 都推到 remote ──
+      # ── 兜底：確保所有 local commits 都推到 remote（僅 fast-forward，遵守禁 force push 規則）──
       - name: 推送 local commits 到 remote（兜底）
         if: steps.check_result.outputs.has_changes == 'true' && steps.resolve_branch.outputs.branch_switched == 'true'
         env:
@@ -475,10 +475,18 @@ jobs:
 
           if [ "$LOCAL_SHA" = "$REMOTE_SHA" ]; then
             echo "ℹ️ Local 與 remote 已同步，無需推送"
+            exit 0
+          fi
+
+          echo "🔄 偵測到 local commits 未推送（local: ${LOCAL_SHA:0:7}, remote: ${REMOTE_SHA:0:7}）"
+          # 僅允許 fast-forward 推送——嚴禁 force push。
+          # 若遠端分支已有不同 commits，停在此處由人工介入，避免覆蓋他人工作。
+          if git push origin "HEAD:${BRANCH}"; then
+            echo "✅ 兜底推送完成（fast-forward）"
           else
-            echo "🔄 偵測到 local commits 未推送（local: ${LOCAL_SHA:0:7}, remote: ${REMOTE_SHA:0:7}）"
-            git push origin "HEAD:${BRANCH}" --force-with-lease
-            echo "✅ 兜底推送完成"
+            echo "::error::fast-forward 推送失敗：遠端分支 ${BRANCH} 可能已有未合併的 commits"
+            echo "::error::為遵守禁止 force push 規則，CI 在此停下；請人工檢查並決定 rebase / merge 策略"
+            exit 1
           fi
 
   # ══════════════════════════════════════════════════
@@ -1105,8 +1113,11 @@ jobs:
           BUNNY_STORAGE_ZONE: ${{ secrets.BUNNY_STORAGE_ZONE }}
           BUNNY_STORAGE_PASSWORD: ${{ secrets.BUNNY_STORAGE_PASSWORD }}
           BUNNY_CDN_URL: ${{ secrets.BUNNY_CDN_URL }}
+          # 使用 claude job 決定的 feature branch，而非 github.ref_name
+          # （issue_comment / pull_request_review* 事件下 github.ref_name 會是預設分支，非正在測試的分支）
+          CI_BRANCH: ${{ needs.claude.outputs.branch_name || github.ref_name }}
         run: |
-          BRANCH_DIR=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
+          BRANCH_DIR=$(echo "${CI_BRANCH}" | sed 's/[^a-zA-Z0-9._-]/-/g')
           bash .github/scripts/upload-to-bunny.sh /tmp/smoke-media "ci/${BRANCH_DIR}/smoke-test"
 
       - name: 上傳 Smoke Test 媒體 Artifact (備份)

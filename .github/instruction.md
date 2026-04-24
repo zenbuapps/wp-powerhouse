@@ -11,8 +11,9 @@
 .github/
 ├── workflows/
 │   ├── pipe.yml         # 主 pipeline (claude job + integration-tests job)
-│   ├── pipe.md          # pipe.yml 的中文規格書（必看）
-│   └── issue.yml        # Issue requirement expansion (PM/DEV 模式)
+│   ├── issue.yml        # Issue requirement expansion (PM/DEV 模式)
+│   └── release.yml      # tag v* 推送時自動打 release zip
+├── pipe.md              # pipe.yml 的中文規格書（必看；刻意放在 workflows/ 外避免被誤認為 workflow）
 ├── act/
 │   └── test.yml         # 本機 act 多 job 結構驗證（不在 workflows/ 內，避免線上誤觸發）
 ├── actions/claude-retry/action.yml   # 3 次重試 + 30s/60s backoff composite
