@@ -533,18 +533,31 @@ jobs:
           git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
 
       # ── 測試環境設置 ─────────────────────────────────
-      - name: 設定 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: 設定 pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: 取得 Composer cache 目錄
+        id: composer_cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer 依賴
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer_cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock', '**/composer.json') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
       - name: 安裝 Node 依賴
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: 安裝 Composer 依賴（主機端）
         run: composer install --no-interaction --prefer-dist

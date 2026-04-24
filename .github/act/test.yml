@@ -37,18 +37,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 設定 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: 設定 pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: 安裝 Node 依賴
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: 安裝 PHP + Composer（act image 未預裝）
         run: |
@@ -99,18 +99,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 設定 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: 設定 pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: 安裝 Node 依賴
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: 安裝 PHP + Composer（act image 未預裝）
         run: |
