@@ -1,7 +1,7 @@
 # 本地 act 測試用 — 驗證多 job 結構（job 依賴鏈 + artifact 傳遞 + build）
 # Windows 用法（需先建立 artifact 目錄）:
 #   mkdir -p "$env:TEMP/act-artifacts"
-#   act workflow_dispatch -W .github/workflows/act-test.yml \
+#   act workflow_dispatch -W .github/act/test.yml \
 #     --container-architecture linux/amd64 \
 #     -P ubuntu-latest=catthehacker/ubuntu:act-latest \
 #     --container-options "--privileged" \
@@ -44,6 +44,8 @@ jobs:
 
       - name: 設定 pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: 安裝 Node 依賴
         run: pnpm install
@@ -104,6 +106,8 @@ jobs:
 
       - name: 設定 pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: 安裝 Node 依賴
         run: pnpm install
