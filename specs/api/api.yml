@@ -50,7 +50,11 @@ paths:
   /options/upload:
     get:
       operationId: getUploadOptions
-      summary: 查詢上傳選項（允許的 MIME 類型）
+      summary: 查詢上傳選項（允許的 MIME 類型，扁平化字串格式）
+      deprecated: true
+      description: |
+        已標記 @deprecated。回傳扁平化的 accept 字串，適用於 HTML input accept 屬性。
+        建議改用 GET /upload/options 取得原始 MIME object。
       tags: [Settings]
       responses:
         '200':
@@ -1608,6 +1612,19 @@ paths:
   # Upload
   # ─────────────────────────────────────────
 
+  /upload/options:
+    get:
+      operationId: getUploadDomainOptions
+      summary: 查詢上傳允許的 MIME 類型（原始 object 格式）
+      tags: [Upload]
+      responses:
+        '200':
+          description: 成功回傳允許的 MIME 類型（key 為副檔名，value 為 MIME 類型）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadDomainOptionsResponse'
+
   /upload:
     post:
       operationId: uploadFile
@@ -2093,6 +2110,19 @@ components:
           additionalProperties:
             type: string
           description: WordPress get_allowed_mime_types() 的結果，key 為副檔名，value 為 MIME 類型
+          example:
+            jpg|jpeg|jpe: image/jpeg
+            png: image/png
+            pdf: application/pdf
+
+    UploadDomainOptionsResponse:
+      type: object
+      properties:
+        allowed_mime_types:
+          type: object
+          additionalProperties:
+            type: string
+          description: WordPress get_allowed_mime_types() 的原始結果，key 為副檔名模式，value 為 MIME 類型
           example:
             jpg|jpeg|jpe: image/jpeg
             png: image/png
