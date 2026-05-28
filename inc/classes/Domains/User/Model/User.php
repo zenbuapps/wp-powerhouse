@@ -170,7 +170,7 @@ final class User extends DTO {
 			'user_login'            => $user->user_login,
 			'user_email'            => $user->user_email,
 			'display_name'          => $user->display_name,
-			'user_registered'       => $user_registered,
+			'user_registered'       => $user_registered ? \get_date_from_gmt( $user_registered ) : '',
 			'user_registered_human' => $user_registered_time ? \human_time_diff( $user_registered_time ) : null,
 			'user_avatar_url'       => $user_avatar_url,
 			'description'           => $user->description,
