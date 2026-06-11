@@ -20,11 +20,14 @@ final class LifeCycle {
 		/** @category 訂閱首次付款成功後 */
 		\add_action( 'woocommerce_subscription_payment_complete', [ $this, Action::INITIAL_PAYMENT_COMPLETE->value ], 10, 1 );
 
-		/** @category 訂閱從成功到失敗 */
-		\add_action( 'woocommerce_subscription_pre_update_status', [ $this, 'subscription_failed' ], 10, 3 );
-
-		/** @category 訂閱從失敗到成功 */
-		\add_action( 'woocommerce_subscription_pre_update_status', [ $this, 'subscription_success' ], 10, 3 );
+		/**
+		 * @category 訂閱從成功到失敗 / 從失敗到成功
+		 * 綁定 woocommerce_subscription_status_updated（狀態持久化後才觸發）
+		 * 不可綁 woocommerce_subscription_pre_update_status：
+		 * 該 hook 在 can_be_updated_to 驗證前觸發，會對「被 WCS 拒絕、實際未發生的轉換」誤發事件
+		 */
+		\add_action( 'woocommerce_subscription_status_updated', [ $this, 'subscription_failed' ], 10, 3 );
+		\add_action( 'woocommerce_subscription_status_updated', [ $this, 'subscription_success' ], 10, 3 );
 
 		\add_filter( 'wcs_renewal_order_created', [ $this, 'renewal_order_created' ], 10, 2 );
 
@@ -144,12 +147,12 @@ final class LifeCycle {
 	/**
 	 * 訂閱從成功到失敗
 	 *
-	 * @param string $from_status old status
+	 * @param mixed  $subscription 訂閱
 	 * @param string $to_status new status
-	 * @param mixed  $subscription post
+	 * @param string $from_status old status
 	 * @return void
 	 */
-	public function subscription_failed( $from_status, $to_status, $subscription ): void {
+	public function subscription_failed( $subscription, $to_status, $from_status ): void {
 		if ( ! ( $subscription instanceof \WC_Subscription ) ) {
 			return;
 		}
@@ -179,13 +182,16 @@ final class LifeCycle {
 
 	/**
 	 * 訂閱從失敗到成功
+	 * 觸發條件：pending-cancel / cancelled / expired → active
+	 * on-hold → active 為催繳補款的日常震盪，不屬於恢復，不觸發
+	 * pending → active 為初次啟用，歸 INITIAL_PAYMENT_COMPLETE 管
 	 *
-	 * @param string $from_status old status
+	 * @param mixed  $subscription 訂閱
 	 * @param string $to_status new status
-	 * @param mixed  $subscription post
+	 * @param string $from_status old status
 	 * @return void
 	 */
-	public function subscription_success( $from_status, $to_status, $subscription ): void {
+	public function subscription_success( $subscription, $to_status, $from_status ): void {
 
 		if ( ! ( $subscription instanceof \WC_Subscription ) ) {
 			return;
@@ -198,8 +204,8 @@ final class LifeCycle {
 			return;
 		}
 
-		// 如果訂閱不是從失敗轉變為成功 就不處理
-		if ( !$from_status->is_failed() || $to_status !== Status::ACTIVE ) {
+		// 如果訂閱不是從失敗/取消中恢復為 active 就不處理
+		if ( ! $from_status->is_recoverable() || $to_status !== Status::ACTIVE ) {
 			return;
 		}
 

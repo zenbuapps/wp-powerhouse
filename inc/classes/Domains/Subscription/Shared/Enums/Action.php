@@ -24,7 +24,7 @@ enum Action: string {
 	// 訂閱從成功到失敗
 	case SUBSCRIPTION_FAILED = 'subscription_failed';
 
-	// 訂閱從失敗到成功
+	// 訂閱從失敗到成功（pending-cancel/cancelled/expired → active；on-hold → active 屬催繳補款，不觸發）
 	case SUBSCRIPTION_SUCCESS = 'subscription_success';
 
 	// 訂閱付款重試

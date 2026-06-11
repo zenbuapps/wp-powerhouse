@@ -35,4 +35,23 @@ enum Status: string {
 			true
 			);
 	}
+
+	/**
+	 * 判斷是否為「轉為 active 時算作恢復」的來源狀態
+	 * [待取消][已取消][已過期]算恢復來源（WCS 中 cancelled 的合法復活路徑為 cancelled → pending-cancel → active）
+	 * [保留]是催繳補款的日常震盪，不算恢復，避免下游（重啟網站、恢復授權碼、自動化 workflow）重複觸發
+	 *
+	 * @return bool
+	 */
+	public function is_recoverable(): bool {
+		return in_array(
+			$this,
+			[
+				self::PENDING_CANCEL,
+				self::CANCELLED,
+				self::EXPIRED,
+			],
+			true
+			);
+	}
 }
