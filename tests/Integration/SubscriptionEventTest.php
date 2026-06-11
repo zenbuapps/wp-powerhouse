@@ -48,6 +48,44 @@ class SubscriptionEventTest extends TestCase {
 		$this->assertSame( 'powerhouse_subscription_at_end', Action::END->get_action_hook() );
 	}
 
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function lifecycle_應綁定_status_updated_而非_pre_update_status(): void {
+		$life_cycle = \J7\Powerhouse\Domains\Subscription\Core\LifeCycle::instance();
+
+		$this->assertNotFalse(
+			\has_action( 'woocommerce_subscription_status_updated', [ $life_cycle, 'subscription_failed' ] ),
+			'subscription_failed 應綁定 woocommerce_subscription_status_updated'
+		);
+		$this->assertNotFalse(
+			\has_action( 'woocommerce_subscription_status_updated', [ $life_cycle, 'subscription_success' ] ),
+			'subscription_success 應綁定 woocommerce_subscription_status_updated'
+		);
+		// pre_update_status 在 can_be_updated_to 驗證前觸發，會對被 WCS 拒絕的轉換誤發事件
+		$this->assertFalse(
+			\has_action( 'woocommerce_subscription_pre_update_status', [ $life_cycle, 'subscription_failed' ] ),
+			'subscription_failed 不應綁定 woocommerce_subscription_pre_update_status'
+		);
+		$this->assertFalse(
+			\has_action( 'woocommerce_subscription_pre_update_status', [ $life_cycle, 'subscription_success' ] ),
+			'subscription_success 不應綁定 woocommerce_subscription_pre_update_status'
+		);
+	}
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function status_is_recoverable_應只認_pending_cancel_cancelled_expired(): void {
+		$this->assertTrue( Status::PENDING_CANCEL->is_recoverable() );
+		$this->assertTrue( Status::CANCELLED->is_recoverable() );
+		$this->assertTrue( Status::EXPIRED->is_recoverable() );
+		$this->assertFalse( Status::ACTIVE->is_recoverable() );
+		$this->assertFalse( Status::ON_HOLD->is_recoverable() );
+	}
+
 	// ========== ✅ 快樂路徑 ==========
 
 	/**
@@ -86,31 +124,89 @@ class SubscriptionEventTest extends TestCase {
 	public function subscription_failed_method_僅在成功到失敗時觸發_action(): void {
 		$life_cycle = \J7\Powerhouse\Domains\Subscription\Core\LifeCycle::instance();
 
-		$fired = 0;
+		$fired_payload = null;
 		\add_action(
 			Action::SUBSCRIPTION_FAILED->get_action_hook(),
-			static function () use ( &$fired ): void {
-				++$fired;
-			}
+			static function ( $subscription, $args ) use ( &$fired_payload ): void {
+				$fired_payload = [ $subscription, $args ];
+			},
+			10,
+			2
 		);
 
-		// non-subscription → 不觸發
-		$life_cycle->subscription_failed( 'active', 'on-hold', new \stdClass() );
-		$this->assertSame( 0, $fired );
-
-		// invalid status → 不觸發
 		$sub_stub = $this->getMockBuilder( '\WC_Subscription' )
 			->disableOriginalConstructor()
 			->getMock();
-		$life_cycle->subscription_failed( 'nonsense', 'also-nonsense', $sub_stub );
-		$this->assertSame( 0, $fired );
+
+		// active → cancelled（成功 → 失敗）→ 觸發
+		$life_cycle->subscription_failed( $sub_stub, 'cancelled', 'active' );
+		$this->assertNotNull( $fired_payload, 'active → cancelled 應觸發' );
+		$this->assertSame( Status::ACTIVE, $fired_payload[1]['from_status'] );
+		$this->assertSame( Status::CANCELLED, $fired_payload[1]['to_status'] );
+
+		// active → on-hold（保留不算失敗）→ 不觸發
+		$fired_payload = null;
+		$life_cycle->subscription_failed( $sub_stub, 'on-hold', 'active' );
+		$this->assertNull( $fired_payload, 'active → on-hold 不應觸發' );
+
+		// cancelled → expired（本來就是失敗狀態）→ 不觸發
+		$life_cycle->subscription_failed( $sub_stub, 'expired', 'cancelled' );
+		$this->assertNull( $fired_payload, 'cancelled → expired 不應觸發' );
+
+		// non-subscription → 不觸發
+		$life_cycle->subscription_failed( new \stdClass(), 'cancelled', 'active' );
+		$this->assertNull( $fired_payload, '非 WC_Subscription 不應觸發' );
+
+		// invalid status → 不觸發
+		$life_cycle->subscription_failed( $sub_stub, 'also-nonsense', 'nonsense' );
+		$this->assertNull( $fired_payload, '無效狀態不應觸發' );
 	}
 
 	/**
 	 * @test
 	 * @group happy
 	 */
-	public function subscription_success_method_僅在失敗到_active_時觸發_action(): void {
+	public function subscription_success_method_在可恢復狀態轉為_active_時觸發_action(): void {
+		$life_cycle = \J7\Powerhouse\Domains\Subscription\Core\LifeCycle::instance();
+
+		$fired_payload = null;
+		\add_action(
+			Action::SUBSCRIPTION_SUCCESS->get_action_hook(),
+			static function ( $subscription, $args ) use ( &$fired_payload ): void {
+				$fired_payload = [ $subscription, $args ];
+			},
+			10,
+			2
+		);
+
+		$sub_stub = $this->getMockBuilder( '\WC_Subscription' )
+			->disableOriginalConstructor()
+			->getMock();
+
+		// pending-cancel → active（cancelled 復活路徑的最後一跳）→ 觸發
+		$life_cycle->subscription_success( $sub_stub, 'active', 'pending-cancel' );
+		$this->assertNotNull( $fired_payload, 'pending-cancel → active 應觸發' );
+		$this->assertSame( Status::PENDING_CANCEL, $fired_payload[1]['from_status'] );
+		$this->assertSame( Status::ACTIVE, $fired_payload[1]['to_status'] );
+
+		// cancelled → active（stock WCS 禁止直達，但可被 filter 解鎖或經 set_status 直寫）→ 觸發
+		$fired_payload = null;
+		$life_cycle->subscription_success( $sub_stub, 'active', 'cancelled' );
+		$this->assertNotNull( $fired_payload, 'cancelled → active 應觸發' );
+		$this->assertSame( Status::CANCELLED, $fired_payload[1]['from_status'] );
+
+		// expired → active → 觸發
+		$fired_payload = null;
+		$life_cycle->subscription_success( $sub_stub, 'active', 'expired' );
+		$this->assertNotNull( $fired_payload, 'expired → active 應觸發' );
+		$this->assertSame( Status::EXPIRED, $fired_payload[1]['from_status'] );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function subscription_success_method_不在催繳補款或非恢復轉換時觸發(): void {
 		$life_cycle = \J7\Powerhouse\Domains\Subscription\Core\LifeCycle::instance();
 
 		$fired = 0;
@@ -121,9 +217,25 @@ class SubscriptionEventTest extends TestCase {
 			}
 		);
 
+		$sub_stub = $this->getMockBuilder( '\WC_Subscription' )
+			->disableOriginalConstructor()
+			->getMock();
+
+		// on-hold → active（催繳補款的日常震盪，非恢復）→ 不觸發
+		$life_cycle->subscription_success( $sub_stub, 'active', 'on-hold' );
+		$this->assertSame( 0, $fired, 'on-hold → active 不應觸發' );
+
+		// pending → active（初次啟用，歸 INITIAL_PAYMENT_COMPLETE 管）→ 不觸發
+		$life_cycle->subscription_success( $sub_stub, 'active', 'pending' );
+		$this->assertSame( 0, $fired, 'pending → active 不應觸發' );
+
+		// cancelled → pending-cancel（復活第一跳，尚未 active）→ 不觸發
+		$life_cycle->subscription_success( $sub_stub, 'pending-cancel', 'cancelled' );
+		$this->assertSame( 0, $fired, 'cancelled → pending-cancel 不應觸發' );
+
 		// non-subscription → 不觸發
-		$life_cycle->subscription_success( 'on-hold', 'active', new \stdClass() );
-		$this->assertSame( 0, $fired );
+		$life_cycle->subscription_success( new \stdClass(), 'active', 'cancelled' );
+		$this->assertSame( 0, $fired, '非 WC_Subscription 不應觸發' );
 	}
 
 	// ========== 🔀 邊緣案例 ==========
