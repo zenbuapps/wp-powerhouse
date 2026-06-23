@@ -144,6 +144,43 @@ export const COLOR_KEYS = COLOR_MAPPER.map(({ key }) => key)
 
 export const THEME_MAPPER = [
 	{
+		// 「跟隨 Blocksy」placeholder 條目。
+		// 色彩 token 為 power 預設佔位值，實際值於執行期由 Blocksy palette 覆蓋
+		// （見 blocksy.ts 的 getBlocksyOklchOverrides）。
+		// 非 Blocksy 站台則卡片 disabled，不會套用此條目。
+		theme: 'blocksy',
+		'color-scheme': 'light',
+		'--in': '72.06% 0.191 231.6',
+		'--su': '64.8% 0.150 160',
+		'--wa': '84.71% 0.199 83.87',
+		'--er': '71.76% 0.221 22.18',
+		'--pc': '1 0 0',
+		'--ac': '1 0 0',
+		'--inc': '1 0 0',
+		'--suc': '1 0 0',
+		'--wac': '1 0 0',
+		'--erc': '1 0 0',
+		'--rounded-box': '1rem',
+		'--rounded-btn': '0.5rem',
+		'--rounded-badge': '1.9rem',
+		'--animation-btn': '0.25s',
+		'--animation-input': '.2s',
+		'--btn-focus-scale': '0.95',
+		'--border-btn': '1px',
+		'--tab-border': '1px',
+		'--tab-radius': '0.5rem',
+		'--p': '59.865739207996604% 0.21935054351796926 259.03952196623266',
+		'--s': '73.61955000221813% 0.14254171057918505 233.93314768063215',
+		'--sc': '1 0 0',
+		'--a': '76.76% 0.184 183.61',
+		'--n': '32.1785% 0.02476 255.701624',
+		'--nc': '89.4994% 0.011585 252.096176',
+		'--b1': '100% 0 0',
+		'--b2': '96.1151% 0 0',
+		'--b3': '92.4169% 0.00108 197.137559',
+		'--bc': '27.8078% 0.029596 256.847952',
+	},
+	{
 		theme: 'power',
 		'color-scheme': 'light',
 		'--in': '72.06% 0.191 231.6',

@@ -135,10 +135,28 @@ class Theme {
 			$setting_array = is_array($setting_array) ? $setting_array : [];
 			$theme_css     = $setting_array['theme_css'] ?? [];
 			$theme         = $setting_array['theme'] ?? 'power';
+			$theme         = is_string($theme) ? $theme : 'power';
+
+			// 「跟隨 Blocksy」模式：每次（每個請求）即時以當前 Blocksy 調色盤覆寫色彩，
+			// 刻意忽略 DB 中的 theme_css 快照（不存快照、動態跟隨）。
+			// selector 正規化為 'power'（daisyUI 已註冊、結構 token 齊全），
+			// 由色彩變數覆寫達成跟隨，無需在 daisyUI 註冊 blocksy 主題。
+			// singleton 隨請求重建，故 Blocksy 改調色盤後下個請求自然同步。
+			if ('blocksy' === $theme) {
+				$overrides = \J7\Powerhouse\Theme\Core\Blocksy::instance()->get_oklch_overrides();
+				$input     = array_merge(
+					[
+						'theme'        => 'power',
+						'color_scheme' => 'light',
+					],
+					$overrides
+				);
+				return new self($input);
+			}
 
 			/** @var array<string, mixed> $theme_css */
 			$theme_css                 = is_array($theme_css) ? $theme_css : [];
-			$theme_css['theme']        = is_string($theme) ? $theme : 'power';
+			$theme_css['theme']        = $theme;
 			$theme_css['color_scheme'] = $theme_css['color-scheme'] ?? 'light';
 			unset($theme_css['color-scheme']);
 

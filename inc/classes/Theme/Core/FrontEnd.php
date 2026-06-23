@@ -38,7 +38,9 @@ class FrontEnd {
 			return "{$output} id=\"tw\" class=\"tailwind\"";
 		}
 
-		$theme = Settings::instance()->theme;
+		// 使用 Theme model 正規化後的 theme：blocksy 模式會正規化為 'power'，
+		// 確保 HTML data-theme 屬性與 print_css() 的 selector 一致（避免樣式落空）。
+		$theme = Theme::instance()->theme;
 		return "{$output} id=\"tw\" class=\"tailwind\" data-theme=\"{$theme}\"";
 	}
 

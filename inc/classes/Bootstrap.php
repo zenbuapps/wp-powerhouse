@@ -159,11 +159,29 @@ final class Bootstrap {
 			]
 		);
 
+		// 「跟隨 Blocksy」前端資料（明文，與加密 env 並列）：
+		// is_blocksy 決定卡片可選性、palette_hex 供後台預覽。失敗一律降級為不可選。
+		$blocksy_data = [
+			'is_blocksy'  => false,
+			'palette_hex' => [],
+		];
+		try {
+			$blocksy_service             = \J7\Powerhouse\Theme\Core\Blocksy::instance();
+			$blocksy_data['is_blocksy']  = $blocksy_service->is_blocksy();
+			$blocksy_data['palette_hex'] = $blocksy_service->get_palette_hex_for_preview();
+		} catch ( \Throwable $e ) {
+			$blocksy_data = [
+				'is_blocksy'  => false,
+				'palette_hex' => [],
+			];
+		}
+
 		\wp_localize_script(
 			Plugin::$kebab,
 			Plugin::$snake . '_data',
 			[
-				'env' => $encrypt_env,
+				'env'     => $encrypt_env,
+				'blocksy' => $blocksy_data,
 			]
 		);
 	}

@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
 import { Form, ColorPicker, InputNumber } from 'antd'
+import { Heading, Switch } from 'antd-toolkit'
+import { useEffect } from 'react'
+
+import { getBlocksyOklchOverrides } from './blocksy'
 import { COLOR_MAPPER, THEME_MAPPER, NUMBER_MAPPER } from './constants'
 import { oklchToHex, hexToOklch } from './utils'
-import { Heading, Switch } from 'antd-toolkit'
 
 const { Item } = Form
 
@@ -19,9 +21,20 @@ const Custom = () => {
 			return
 		}
 		const theme = THEME_MAPPER.find(
-			({ theme: singleTheme }) => singleTheme === watchTheme,
+			({ theme: singleTheme }) => singleTheme === watchTheme
 		)
 		if (!theme) return
+
+		// blocksy 特例：以 placeholder 為基底，疊加當前 Blocksy palette 衍生的 OKLCH，
+		// 寫入 theme_css 供預覽顯示「當前實際配色」（而非 placeholder 預設）。
+		if ('blocksy' === watchTheme) {
+			const paletteHex = window?.powerhouse_data?.blocksy?.palette_hex || []
+			form.setFieldValue(['powerhouse_settings', 'theme_css'], {
+				...theme,
+				...getBlocksyOklchOverrides(paletteHex),
+			})
+			return
+		}
 
 		// const formattedTheme = formatTheme(theme)
 		form.setFieldValue(['powerhouse_settings', 'theme_css'], theme)
