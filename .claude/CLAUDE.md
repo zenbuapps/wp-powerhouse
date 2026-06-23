@@ -1,6 +1,6 @@
 # Powerhouse
 
-> **Last synced:** 2026-04-09 | **Version:** 3.3.48 | **PHP Namespace:** `J7\Powerhouse`
+> **Last synced:** 2026-06-23 | **Version:** 3.3.48 | **PHP Namespace:** `J7\Powerhouse`
 
 ## 1. What This Plugin Does
 
@@ -9,7 +9,7 @@ Power 系列外掛的基礎架構平台（Foundation Plugin）。提供統一 RE
 **Core capabilities:**
 - **Unified REST API**: 20+ domain API（Post / User / Order / Product / Term / Comment / Upload 等）
 - **License Code System**: 多外掛授權碼統一管理
-- **Theme System**: 跨 Power 生態系的主題色彩系統
+- **Theme System**: 跨 Power 生態系的主題色彩系統；支援「跟隨 Blocksy」動態橋接（偵測 Blocksy 主題後即時讀取調色盤，轉換為 OKLCH 套用至 daisyUI 色彩變數）
 - **Admin SPA**: React + Refine 管理介面（Settings / License Codes）
 - **API Booster**: mu-plugin 級 API 效能優化
 - **Email System**: 延遲發送、domain 驗證、CAPTCHA
@@ -92,6 +92,10 @@ J7\Powerhouse\
 │
 ├── Settings\Model\Settings         # Main settings DTO (powerhouse_settings)
 ├── Theme\Core\                     # Theme color system
+│   ├── FrontEnd                    # wp_head 輸出 CSS 色彩變數（讀正規化後的 theme）
+│   └── Blocksy                     # Blocksy 偵測、調色盤讀取、OKLCH 覆寫生成（Singleton）
+├── Theme\Utils\ColorConvert        # 靜態工具：hex_to_oklch()，Hex→OKLCH 色彩轉換
+├── Theme\Model\Theme               # Theme DTO + blocksy 分支覆寫邏輯
 ├── Shared\{Enums, Helpers}         # Shared enums & helpers
 └── Utils\                          # Utilities
     ├── Base (encryption, templates, plugin links)
@@ -160,7 +164,7 @@ J7\Powerhouse\
 |----------|-------------|
 | **General** | enable_manual_send_email, enable_captcha_login/register, email_domain_check |
 | **WooCommerce** | delay_email, last_name_optional |
-| **Theme** | theme, enable_theme, enable_theme_changer, theme_css |
+| **Theme** | theme（可選值：`power` \| `blocksy`），enable_theme, enable_theme_changer, theme_css |
 | **Lab** | api_booster_rules, api_booster_rule_recipes |
 | **BunnyCDN** | bunny_library_id, bunny_cdn_hostname, bunny_stream_api_key |
 

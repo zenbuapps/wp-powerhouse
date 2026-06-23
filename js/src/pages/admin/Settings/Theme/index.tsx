@@ -1,10 +1,12 @@
-import { memo } from 'react'
-import { Heading, Switch } from 'antd-toolkit'
 import { Form } from 'antd'
-import Option from './Option'
-import Custom from './Custom'
+import { Heading, Switch } from 'antd-toolkit'
+import { memo } from 'react'
+
 import { THEME_MAPPER } from './constants'
+import Custom from './Custom'
+import Option from './Option'
 import { getStyle } from './utils'
+
 import hoodie from '@/assets/images/hoodie.jpg'
 
 const { Item } = Form
@@ -13,6 +15,12 @@ const index = () => {
 	const form = Form.useFormInstance()
 	const watchTheme =
 		Form.useWatch(['powerhouse_settings', 'theme'], form) || 'power'
+
+	// 後端 localize 的 Blocksy 跟隨資訊；舊快取 JS 可能無此 key，以預設值兜底
+	const { is_blocksy, palette_hex } = window?.powerhouse_data?.blocksy || {
+		is_blocksy: false,
+		palette_hex: [],
+	}
 
 	// 自訂的
 	const watchCustomThemeOKLCH =
@@ -41,7 +49,16 @@ const index = () => {
 					/>
 					<div className="rounded-box grid grid-cols-2 gap-4">
 						<Option theme="custom" form={form} />
-						{THEME_MAPPER.map(({ theme: singleTheme }) => (
+						<Option
+							theme="blocksy"
+							form={form}
+							disabled={!is_blocksy}
+							disabledTooltip="需使用 Blocksy 主題"
+							paletteHex={palette_hex}
+						/>
+						{THEME_MAPPER.filter(
+							({ theme: singleTheme }) => 'blocksy' !== singleTheme
+						).map(({ theme: singleTheme }) => (
 							<Option key={singleTheme} theme={singleTheme} form={form} />
 						))}
 					</div>
