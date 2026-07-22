@@ -122,6 +122,25 @@ class ThemeTest extends TestCase {
 	}
 
 	/**
+	 * 讀取當前 Theme singleton 的原始值（不觸發 instance() 的組裝邏輯）。
+	 *
+	 * @return \J7\Powerhouse\Theme\Model\Theme|null
+	 */
+	private function peek_theme_singleton(): ?\J7\Powerhouse\Theme\Model\Theme {
+		$ref = new \ReflectionProperty( \J7\Powerhouse\Theme\Model\Theme::class, 'instance' );
+		$ref->setAccessible( true );
+		/** @var \J7\Powerhouse\Theme\Model\Theme|null $value */
+		$value = $ref->getValue();
+		return $value;
+	}
+
+	/** 每個測試後歸零 Theme singleton，避免跨測試污染 */
+	public function tear_down(): void {
+		$this->reset_theme_singleton();
+		parent::tear_down();
+	}
+
+	/**
 	 * @test
 	 * @group happy
 	 */
@@ -154,7 +173,7 @@ class ThemeTest extends TestCase {
 	 * @test
 	 * @group happy
 	 */
-	public function blocksy_模式_theme_應正規化為_power_供_selector 使用(): void {
+	public function blocksy_模式_theme_應正規化為_power_供_selector_使用(): void {
 		$this->reset_theme_singleton();
 		$this->set_powerhouse_settings(
 			[
@@ -171,7 +190,7 @@ class ThemeTest extends TestCase {
 	 * @test
 	 * @group happy
 	 */
-	public function blocksy_模式_print_css_的_selector_應為_power 而非_blocksy(): void {
+	public function blocksy_模式_print_css_的_selector_應為_power_而非_blocksy(): void {
 		$this->reset_theme_singleton();
 		$this->set_powerhouse_settings(
 			[
@@ -223,5 +242,121 @@ class ThemeTest extends TestCase {
 		$theme = \J7\Powerhouse\Theme\Model\Theme::instance();
 		// 無 blocksy_manager → overrides 空 → primary 維持 Powerhouse 預設值
 		$this->assertSame( '59.865739207996604% 0.21935054351796926 259.03952196623266', $theme->p );
+	}
+
+	// ========== 🐞 回歸：Theme singleton 過早催生（issue #257）==========
+	//
+	// 症狀：站台設為「跟隨 Blocksy」，前台仍輸出 Powerhouse 預設色。
+	// 根因：Settings::instance() 於 plugins_loaded（priority -10）就被 Bootstrap 的
+	//       Admin\Account / Admin\DelayEmail / Captcha\Core\Login constructor 催生，
+	//       該階段早於主題 functions.php 載入、blocksy_manager() 未定義 → overrides 空；
+	//       空結果被寫進 Theme singleton 後鎖死整個請求，wp_head 階段再也算不回正確顏色。
+
+	/**
+	 * 根治點：Settings 的 constructor 不得觸發 Theme::instance()。
+	 *
+	 * @test
+	 * @group error
+	 */
+	public function settings_建立時不應提前催生_theme_singleton(): void {
+		$this->reset_theme_singleton();
+		$this->set_powerhouse_settings(
+			[
+				'enable_theme' => 'yes',
+				'theme'        => 'blocksy',
+			]
+		);
+
+		// 模擬 Bootstrap 於 plugins_loaded 階段催生 Settings
+		\J7\Powerhouse\Settings\Model\Settings::instance();
+
+		$this->assertNull(
+			$this->peek_theme_singleton(),
+			'Settings constructor 不得呼叫 Theme::instance()，否則 Blocksy 尚未載入時會鎖死空覆寫（issue #257）'
+		);
+	}
+
+	/**
+	 * 縱深防禦：blocksy 模式取不到調色盤時，不得把「全預設色」快取進 singleton。
+	 *
+	 * @test
+	 * @group error
+	 */
+	public function blocksy_取不到調色盤時不應快取空覆寫的_theme_singleton(): void {
+		$this->reset_theme_singleton();
+		$this->set_powerhouse_settings(
+			[
+				'enable_theme' => 'yes',
+				'theme'        => 'blocksy',
+			]
+		);
+
+		// 測試環境無 blocksy_manager → overrides 為空
+		$theme = \J7\Powerhouse\Theme\Model\Theme::instance();
+
+		$this->assertInstanceOf( \J7\Powerhouse\Theme\Model\Theme::class, $theme, '仍應回傳可用實例（降級為預設色）' );
+		$this->assertNull(
+			$this->peek_theme_singleton(),
+			'空覆寫不得留存於 singleton，否則後續較晚階段無法重新取值（issue #257）'
+		);
+	}
+
+	/**
+	 * 端到端：早期催生 Settings 之後，較晚階段的 Theme::instance() 仍須反映當下狀態。
+	 *
+	 * 以「設定在兩次呼叫之間改變」代理真實情境中的「Blocksy 從不可用變為可用」，
+	 * 兩者失效機制相同——singleton 一旦於早期定型就永遠回舊值。
+	 *
+	 * @test
+	 * @group edge
+	 */
+	public function 早期催生_settings_不得鎖死後續的_theme_取值(): void {
+		$this->reset_theme_singleton();
+
+		// 階段一：plugins_loaded——theme=blocksy 且 Blocksy 尚未載入（overrides 空）
+		$this->set_powerhouse_settings(
+			[
+				'enable_theme' => 'yes',
+				'theme'        => 'blocksy',
+			]
+		);
+		\J7\Powerhouse\Settings\Model\Settings::instance();
+
+		// 階段二：主題載入後——此時才有正確資料可取（不重置 Theme singleton，這正是測試重點）
+		$this->set_powerhouse_settings(
+			[
+				'enable_theme' => 'yes',
+				'theme'        => 'dark',
+			]
+		);
+
+		$this->assertSame(
+			'dark',
+			\J7\Powerhouse\Theme\Model\Theme::instance()->theme,
+			'Theme 於早期階段被催生後，較晚階段仍須能重新取值（issue #257）'
+		);
+	}
+
+	/**
+	 * 回歸護欄：theme_css 改為延遲取值後，to_array() 仍須帶出完整主題色。
+	 *
+	 * @test
+	 * @group happy
+	 */
+	public function settings_to_array_延遲取值後仍應包含完整_theme_css(): void {
+		$this->reset_theme_singleton();
+		$this->set_powerhouse_settings(
+			[
+				'enable_theme' => 'yes',
+				'theme'        => 'light',
+			]
+		);
+
+		$arr = \J7\Powerhouse\Settings\Model\Settings::instance()->to_array();
+
+		$this->assertArrayHasKey( 'theme_css', $arr );
+		$this->assertIsArray( $arr['theme_css'] );
+		$this->assertArrayHasKey( '--p', $arr['theme_css'], 'theme_css 應含 daisyUI 色彩 token' );
+		$this->assertSame( 'light', $arr['theme_css']['theme'] ?? null );
 	}
 }
