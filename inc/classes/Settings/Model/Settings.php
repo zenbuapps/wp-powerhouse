@@ -62,7 +62,14 @@ class Settings extends BaseDTO {
 	/** @var string $enable_theme 啟用主題 */
 	public string $enable_theme = 'yes';
 
-	/** @var array<string, string> $theme_css 當選擇 custom 主題時，使用自訂的 css */
+	/**
+	 * 當選擇 custom 主題時，使用自訂的 css
+	 *
+	 * 此屬性僅作為 partial_update() 寫回 DB 時的欄位載體，**不是**權威值。
+	 * 實際值一律於 to_array() 當下向 Theme::instance() 取得（延遲取值，理由見 to_array()）。
+	 *
+	 * @var array<string, string> $theme_css
+	 */
 	public array $theme_css = [];
 
 
@@ -95,8 +102,29 @@ class Settings extends BaseDTO {
 	 */
 	public function __construct( array $input = [] ) {
 		parent::__construct($input);
-		self::$instance  = $this;
-		$this->theme_css = Theme::instance()->to_array();
+		self::$instance = $this;
+		// 刻意不在此取 theme_css，避免提前催生 Theme singleton，理由見 to_array()。
+	}
+
+	/**
+	 * 取得公開的屬性 array
+	 *
+	 * 延遲取值：theme_css 於此刻才向 Theme 取得，**不在 constructor 取**。
+	 *
+	 * 原因：Settings::instance() 會在 plugins_loaded（priority -10）就被 Bootstrap 的
+	 * Admin\Account / Admin\DelayEmail / Captcha\Core\Login 等模組的 constructor 催生，
+	 * 而該階段早於 WordPress 載入主題 functions.php。若在 constructor 呼叫 Theme::instance()，
+	 * 「跟隨 Blocksy」模式會因 blocksy_manager() 尚未定義而拿到空覆寫，
+	 * 空結果又被 Theme singleton 快取整個請求，導致前台永遠輸出 Powerhouse 預設色。
+	 *
+	 * 延遲到 to_array()（僅由 REST API 與 partial_update() 呼叫，皆在主題載入後）即可取到正確調色盤。
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function to_array(): array {
+		$array              = parent::to_array();
+		$array['theme_css'] = Theme::instance()->to_array();
+		return $array;
 	}
 
 	/**

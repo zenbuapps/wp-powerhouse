@@ -106,7 +106,7 @@ class Theme {
 	/** @var string color_scheme 顏色方案 */
 	public string $color_scheme = 'light';
 
-	/** @var self 實例 */
+	/** @var self|null 實例；尚未建立、或刻意作廢（見 instance() 的 blocksy 分支）時為 null */
 	protected static $instance = null;
 
 	/**
@@ -151,7 +151,18 @@ class Theme {
 					],
 					$overrides
 				);
-				return new self($input);
+				$instance  = new self($input);
+
+				// 縱深防禦：$overrides 為空代表當下取不到 Blocksy 調色盤，
+				// 最典型的情況是在 plugins_loaded 階段被呼叫——此時主題 functions.php 尚未載入、
+				// blocksy_manager() 未定義。constructor 已把自己寫進 self::$instance，
+				// 若不清掉，這份「全預設色」會被快取整個請求，讓後續 wp_head 階段再也算不出正確顏色。
+				// 清為 null 可讓較晚階段（language_attributes / wp_head）重新取值。
+				if (!$overrides) {
+					self::$instance = null;
+				}
+
+				return $instance;
 			}
 
 			/** @var array<string, mixed> $theme_css */
