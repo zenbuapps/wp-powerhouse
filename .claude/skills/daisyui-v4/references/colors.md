@@ -1,7 +1,13 @@
----
-name: daisyui-v4-colors
-description: MANDATORY color, theme and CSS variable rules for daisyUI 4
----
+## Contents
+
+| Section | What it covers |
+|---|---|
+| daisyUI 4 color names · How the variables are consumed · color rules · Color utility classes | The 20 semantic color names, the `--p` / `--b1` short-name variables and the `oklch(var(--p)/1)` consumption pattern |
+| Border radius utilities | `rounded-box`, `rounded-btn`, `rounded-badge` |
+| Theme CSS variables · Component specific CSS variables | Full variable list incl. `--rounded-*`, `--animation-*`, `--btn-focus-scale`, `--tab-*` |
+| Built-in themes (32) · Nesting themes | Theme names and `data-theme` nesting |
+| Custom theme · Customize an existing theme · Theme-scoped custom styles | Writing themes in `tailwind.config.js` |
+| This project's theme (Powerhouse) | The `power` theme and its overrides |
 
 ## daisyUI 4 colors
 

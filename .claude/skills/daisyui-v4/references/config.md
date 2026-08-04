@@ -1,7 +1,10 @@
----
-name: daisyui-v4-config
-description: Configuration options for daisyUI 4 in tailwind.config.js
----
+## Contents
+
+- **Config** — where the `daisyui: {}` block lives in `tailwind.config.js`
+- **Config values explained** — `styled` · `themes` · `base` · `utils` · `logs` · `darkTheme` · `prefix` · `themeRoot`
+- **Example config** — a full annotated block
+- **Tailwind CSS 3 `dark:` variant for a daisyUI theme**
+- **This project's config (Powerhouse)** — the actual `tailwind.config.cjs` settings
 
 ## Config
 
@@ -62,7 +65,7 @@ If it's false, only light and dark themes will be available.
 If it's an array, only themes in the array will be included and **the first theme will be the default
 theme**.
 An empty array (`[]`) includes no themes and disables all colors.
-See [../colors/SKILL.md](../colors/SKILL.md) for theme definitions.
+See [./colors.md](./colors.md) for theme definitions.
 
 ### `base`
 

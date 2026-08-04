@@ -39,6 +39,8 @@ globs: "js/src/**/*.{ts,tsx,scss,css}"
 
 ## Style 規則
 - TailwindCSS 用於 layout
+- daisyUI 4（`^4.12.23`）提供元件 class，**必須加 `pc-` prefix**（`pc-btn`、`pc-card-body`）；
+  寫任何 daisyUI 標記前先載入 `daisyui-v4` skill（含 55 個元件的 class 清單與專案特殊設定）
 - Ant Design CSS-in-JS 用於元件樣式
 - antd-style 用於自訂 token
 - SCSS 用於全域樣式（admin.scss, front.scss, blocknote.scss）

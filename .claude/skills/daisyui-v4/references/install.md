@@ -1,8 +1,3 @@
----
-name: daisyui-v4-install
-description: Installation notes for daisyUI 4 on Tailwind CSS 3
----
-
 ## daisyUI 4 install notes
 
 [install guide](https://v4.daisyui.com/docs/install/)

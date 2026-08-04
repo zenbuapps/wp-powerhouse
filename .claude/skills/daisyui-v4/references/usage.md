@@ -1,7 +1,11 @@
----
-name: daisyui-v4-usage
-description: MANDATORY usage rules for daisyUI 4
----
+## Contents
+
+- **usage rules** · **Class name categories** — how to combine component / part / modifier classes
+- **Responsive class names** — daisyUI 4 emits responsive variants for modifiers (`sm:btn-md`)
+- **Form fields: `form-control` and `label`** · **Borders are opt-in on form fields** — the v4 form pattern
+- **Deprecated components** — `btn-group`, `input-group` and their `join` replacements
+- **Customizing a component in CSS** · **utilities and variables** · **Skeleton (unstyled) mode**
+- **Prefix reminder for this project** — the `pc-` rule
 
 ## daisyUI 4 usage rules
 
@@ -135,7 +139,7 @@ border. Add the `-bordered` modifier when a visible border is wanted:
 ## Deprecated components
 
 `btn-group` and `input-group` still work in 4.12.x but are marked deprecated in the official docs and
-will be removed in the next major version. Use [join](../components/join.md) instead for new code.
+will be removed in the next major version. Use [join](./components/join.md) instead for new code.
 
 [button-group docs](https://v4.daisyui.com/components/button-group/) ·
 [input-group docs](https://v4.daisyui.com/components/input-group/)
@@ -192,18 +196,18 @@ Or scope the override to one theme:
   `[--animation-btn:0]`, `[--tab-bg:yellow]`, `[--tooltip-color:red]`.
 - Components expose their own CSS variables — `--value` on countdown, `--value` / `--size` /
   `--thickness` on radial-progress, `--tab-bg` / `--tab-border-color` on tab, `--tglbg` on toggle.
-  See [../colors/SKILL.md](../colors/SKILL.md) for the full list.
+  See [./colors.md](./colors.md) for the full list.
 
 ## Skeleton (unstyled) mode
 
 Setting `styled: false` in the daisyUI config strips daisyUI's colors and design decisions and leaves
 only the structural CSS, so you can design your own look on top of the component skeletons. See
-[../config/SKILL.md](../config/SKILL.md).
+[./config.md](./config.md).
 
 ## Prefix reminder for this project
 
 `tailwind.config.cjs` sets `daisyui.prefix: 'pc-'`. Every component/part/modifier/responsive class
-name in `../components/` must be written with the `pc-` prefix in this project's code:
+name in `./components/` must be written with the `pc-` prefix in this project's code:
 
 ```html
 <button class="pc-btn pc-btn-primary pc-btn-sm">Button</button>

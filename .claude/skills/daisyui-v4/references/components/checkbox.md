@@ -30,4 +30,4 @@ With label and form-control:
 - Disable it with the native `disabled` attribute
 - Set the indeterminate state from JS: `document.getElementById("id").indeterminate = true`
 - Override colors with `[--chkbg:…]` and `[--chkfg:…]`
-- `form-control` is the flex-column wrapper, `label` is the flex row, `label-text` is the text — see ../usage/SKILL.md
+- `form-control` is the flex-column wrapper, `label` is the flex row, `label-text` is the text — see ../usage.md
