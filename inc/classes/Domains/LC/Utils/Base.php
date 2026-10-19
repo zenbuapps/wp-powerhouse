@@ -233,8 +233,18 @@ class Base {
 			return $data;
 		}
 
-		// 只有 401 才回 WP_Error，其他都直接 throw
+		// 只有「CloudServer 判定授權碼無效」的 401 才回 WP_Error，其他都直接 throw
 		// 因為後續處理中 WP_Error 會掉授權，其他種類 throw 會維持原本狀態
+		//
+		// 401 有兩種來源，靠 body 有沒有 `code` 區分：
+		// - CloudServer 的授權判定（碼無效、狀態不可啟用、網域不符）→ body 只有 `message`
+		// - WP REST 的認證／權限錯誤（rest_forbidden、incorrect_password…）→ body 帶 `code`
+		// 後者與授權碼本身無關，CloudServer 撤銷或更換 API 憑證時每個站都會同時收到；
+		// 若照舊當成「授權無效」，所有站會在下一次系統檢查時一起掉授權、要手動重輸授權碼
+		if (401 === $status_code && !empty($data['code'])) {
+			throw new \Exception($data['message'] ?? 'unknown error', $status_code); // @phpstan-ignore-line
+		}
+
 		if (401 === $status_code) {
 			return new \WP_Error($status_code, $data['message'] ?? 'unknown error');
 		}
