@@ -7,8 +7,8 @@
  * - 帶來的 code 與已存的相同 → 刪除授權碼與快取（舊行為）
  *   授權碼被釋出成「可用」時，CloudServer 的 activate 會把可用的碼綁到請求的網域，
  *   所以必須刪，否則下一次系統檢查會把剛釋出的碼重新綁回本站
- * - code 不符、或本站沒有已存的碼 → 只清快取，下一次系統檢查交給 CloudServer 判定
- * - 沒帶 code → 照舊刪除（舊版 CloudServer 不帶 code）
+ * - 沒帶 code、code 不符、或本站沒有已存的碼 → 只清快取，下一次系統檢查交給 CloudServer 判定
+ *   （根除版：前提是 CloudServer 已全面帶 code）
  */
 
 declare( strict_types=1 );
@@ -169,19 +169,19 @@ class LicenseCodeInvalidateTest extends TestCase {
 	}
 
 	/**
-	 * 舊版 CloudServer 不帶 code，必須維持舊行為，否則釋出授權碼後舊站會把碼重新綁回自己
+	 * 根除版：CloudServer 已全面帶 code，不帶 code 的請求不是 CloudServer 發的，不可刪除授權碼
 	 *
 	 * @test
-	 * @group happy
+	 * @group security
 	 */
-	public function 不帶_code_應照舊刪除授權碼與快取(): void {
+	public function 不帶_code_應保留授權碼_只清快取(): void {
 		$this->given_activated_code();
 
 		$response = $this->invalidate( [ 'product_slug' => self::PRODUCT_SLUG ] );
 
 		$this->assertSame( 200, $response->get_status() );
-		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, $this->saved_codes() );
-		$this->assertFalse( \get_transient( 'lc_' . self::PRODUCT_SLUG ) );
+		$this->assertSame( self::SAVED_CODE, $this->saved_codes()[ self::PRODUCT_SLUG ] ?? null, '授權碼不可被刪除' );
+		$this->assertFalse( \get_transient( 'lc_' . self::PRODUCT_SLUG ), '快取應被清除，強制下次重新檢查' );
 	}
 
 	/**

@@ -206,17 +206,18 @@ class Base {
 	 * - 帶來的 code 與本站已存的授權碼相同 → 刪除授權碼與快取（與舊版相同）
 	 *   授權碼被釋出成「可用」時，CloudServer 的 activate 會把可用的碼綁到請求的網域，
 	 *   若只清快取，下一次系統檢查就會把剛釋出的碼重新綁回本站，所以必須刪
-	 * - code 不符，或本站沒有已存的碼 → 只清快取，強制下次重新檢查，由 CloudServer 判定
+	 * - 沒帶 code、code 不符，或本站沒有已存的碼 → 只清快取，強制下次重新檢查，由 CloudServer 判定
+	 *
+	 * ⚠️ 前提：CloudServer（power-partner-server）已全面在 invalidate 帶 code。
+	 * 舊版 CloudServer 不帶 code，對它來說釋出授權碼後舊站只會清快取，下一次系統檢查就把碼重新綁回自己
 	 *
 	 * @param string $product_slug 產品 slug
 	 * @param string $code         請求帶來的授權碼，空字串代表沒帶
 	 * @return bool 快取是否刪除成功
 	 */
 	public static function invalidate( string $product_slug, string $code ): bool {
-		// 舊版 CloudServer 不帶 code：照舊刪除授權碼與快取
-		// ⚠️ 根除版（CloudServer 全面帶 code 之後才發布）會拿掉這個分支，改成只清快取
 		if ('' === $code) {
-			return self::delete_lc_transient($product_slug);
+			return self::clear_lc_cache($product_slug);
 		}
 
 		/** @var array<string, string> $saved_codes 產品 key 和 code */
