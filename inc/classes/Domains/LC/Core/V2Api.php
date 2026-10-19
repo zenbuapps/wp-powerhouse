@@ -137,6 +137,9 @@ final class V2Api extends ApiBase {
 	/**
 	 * 清除 LC 快取
 	 *
+	 * CloudServer 在授權碼狀態改變時呼叫，body 為 {product_slug, code}。
+	 * 只有 code 與本站已存的授權碼相同才會刪除授權碼，見 Base::invalidate()
+	 *
 	 * @param \WP_REST_Request $request 包含新增用戶所需資料的REST請求對象。
 	 * @return \WP_REST_Response 返回包含操作結果的REST響應對象。成功時返回用戶資料，失敗時返回錯誤訊息。
 	 */
@@ -156,7 +159,8 @@ final class V2Api extends ApiBase {
 		// TEST 印出 WC Logger 記得移除 ---- //
 		\J7\WpUtils\Classes\WC::log($product_slug, 'delete_lc_transient from post_lc_invalidate_callback');
 		// ---------- END TEST ---------- //
-		$delete_transient_result = Base::delete_lc_transient( $product_slug );
+		$code                    = \is_string( $body_params['code'] ?? null ) ? $body_params['code'] : '';
+		$delete_transient_result = Base::invalidate( (string) $product_slug, $code );
 
 		return new \WP_REST_Response(
 			[

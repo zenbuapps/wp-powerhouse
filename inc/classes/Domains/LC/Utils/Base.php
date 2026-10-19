@@ -188,6 +188,62 @@ class Base {
 	}
 
 	/**
+	 * 只清除 LC 快取（transient），不動已存的授權碼
+	 *
+	 * 下一次系統檢查（Bootstrap 掛在 plugins_loaded:999 的 check_lc_array → get_lc_array）
+	 * 會因 transient 不存在而以已存的授權碼重打 activate，由 CloudServer 重新判定
+	 *
+	 * @param string $product_slug 產品 slug
+	 * @return bool 是否刪除成功
+	 */
+	public static function clear_lc_cache( string $product_slug ): bool {
+		return (bool) \delete_transient("lc_{$product_slug}");
+	}
+
+	/**
+	 * CloudServer 通知授權碼狀態改變（lc/invalidate），以授權碼本身驗證請求
+	 *
+	 * - 帶來的 code 與本站已存的授權碼相同 → 刪除授權碼與快取（與舊版相同）
+	 *   授權碼被釋出成「可用」時，CloudServer 的 activate 會把可用的碼綁到請求的網域，
+	 *   若只清快取，下一次系統檢查就會把剛釋出的碼重新綁回本站，所以必須刪
+	 * - code 不符，或本站沒有已存的碼 → 只清快取，強制下次重新檢查，由 CloudServer 判定
+	 *
+	 * @param string $product_slug 產品 slug
+	 * @param string $code         請求帶來的授權碼，空字串代表沒帶
+	 * @return bool 快取是否刪除成功
+	 */
+	public static function invalidate( string $product_slug, string $code ): bool {
+		// 舊版 CloudServer 不帶 code：照舊刪除授權碼與快取
+		// ⚠️ 根除版（CloudServer 全面帶 code 之後才發布）會拿掉這個分支，改成只清快取
+		if ('' === $code) {
+			return self::delete_lc_transient($product_slug);
+		}
+
+		/** @var array<string, string> $saved_codes 產品 key 和 code */
+		$saved_codes = \get_option(self::KEY, []);
+		$saved_codes = is_array($saved_codes) ? $saved_codes : []; // @phpstan-ignore-line
+		$saved_code  = (string) ( $saved_codes[ $product_slug ] ?? '' );
+
+		if ('' === $saved_code) {
+			return self::clear_lc_cache($product_slug);
+		}
+
+		if (\hash_equals($saved_code, $code)) {
+			return self::delete_lc_transient($product_slug);
+		}
+
+		Plugin::logger(
+			'lc/invalidate 帶來的授權碼與本站已存的不符，只清快取、不刪授權碼',
+			'warning',
+			[
+				'product_slug' => $product_slug,
+				'ip'           => \sanitize_text_field( \wp_unslash( (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) ) ), // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated
+			]
+		);
+		return self::clear_lc_cache($product_slug);
+	}
+
+	/**
 	 * 啟用授權碼
 	 *
 	 * @param string $code 授權碼
