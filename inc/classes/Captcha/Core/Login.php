@@ -17,12 +17,31 @@ final class Login extends Base {
 	/** @var string 驗證碼容器 class 用來區分是 login 還是 register */
 	protected string $container_class = 'login';
 
+	/**
+	 * 不掛登入驗證碼的 REQUEST_URI（子字串比對，同一組內的字串都出現才算符合）
+	 *
+	 * 這三條是 power-partner-server 的 server 對 server 真實密碼驗證：由經銷商站的 PHP 送出，
+	 * 不是人在登入頁登入，帶不了驗證碼；server 端已有自己的失敗限流（CredentialThrottle）
+	 * - identity：經銷商登入（舊流程）
+	 * - v3/connect：以經銷商帳密換取專屬應用程式密碼
+	 * - logs/{id}/detail：點數明細（以經銷商帳密驗證）
+	 *
+	 * ⛔ 不可擴大到其他路徑，也不可整個 power-partner-server namespace 一起豁免
+	 *
+	 * @var array<int, array<int, string>>
+	 */
+	const EXEMPT_REQUEST_URIS = [
+		[ 'power-partner-server/identity' ],
+		[ 'power-partner-server/v3/connect' ],
+		[ 'power-partner-server/logs/', '/detail' ],
+	];
+
 	/** Constructor */
 	public function __construct() {
 		$settings = Settings::instance();
 
 		$request_url = (string) ( $_SERVER['REQUEST_URI'] ?? '' ); // phpcs:ignore
-		if (\str_contains($request_url, 'power-partner-server/identity')) {
+		if (self::is_exempt_request_uri($request_url)) {
 			return;
 		}
 
@@ -39,6 +58,28 @@ final class Login extends Base {
 
 		// ajax
 		\add_action('wp_ajax_nopriv_need_captcha', [ $this, 'need_captcha' ]);
+	}
+
+	/**
+	 * 這次請求是否不掛登入驗證碼，見 EXEMPT_REQUEST_URIS
+	 *
+	 * @param string $request_uri REQUEST_URI
+	 * @return bool
+	 */
+	public static function is_exempt_request_uri( string $request_uri ): bool {
+		foreach (self::EXEMPT_REQUEST_URIS as $needles) {
+			$matched = true;
+			foreach ($needles as $needle) {
+				if (!\str_contains($request_uri, $needle)) {
+					$matched = false;
+					break;
+				}
+			}
+			if ($matched) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** 驗證碼驗證
