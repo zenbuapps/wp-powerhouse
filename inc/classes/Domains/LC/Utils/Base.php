@@ -188,6 +188,63 @@ class Base {
 	}
 
 	/**
+	 * 只清除 LC 快取（transient），不動已存的授權碼
+	 *
+	 * 下一次系統檢查（Bootstrap 掛在 plugins_loaded:999 的 check_lc_array → get_lc_array）
+	 * 會因 transient 不存在而以已存的授權碼重打 activate，由 CloudServer 重新判定
+	 *
+	 * @param string $product_slug 產品 slug
+	 * @return bool 是否刪除成功
+	 */
+	public static function clear_lc_cache( string $product_slug ): bool {
+		return (bool) \delete_transient("lc_{$product_slug}");
+	}
+
+	/**
+	 * CloudServer 通知授權碼狀態改變（lc/invalidate），以授權碼本身驗證請求
+	 *
+	 * - 帶來的 code 與本站已存的授權碼相同 → 刪除授權碼與快取（與舊版相同）
+	 *   授權碼被釋出成「可用」時，CloudServer 的 activate 會把可用的碼綁到請求的網域，
+	 *   若只清快取，下一次系統檢查就會把剛釋出的碼重新綁回本站，所以必須刪
+	 * - 沒帶 code、code 不符，或本站沒有已存的碼 → 只清快取，強制下次重新檢查，由 CloudServer 判定
+	 *
+	 * ⚠️ 前提：CloudServer（power-partner-server）已全面在 invalidate 帶 code。
+	 * 舊版 CloudServer 不帶 code，對它來說釋出授權碼後舊站只會清快取，下一次系統檢查就把碼重新綁回自己
+	 *
+	 * @param string $product_slug 產品 slug
+	 * @param string $code         請求帶來的授權碼，空字串代表沒帶
+	 * @return bool 快取是否刪除成功
+	 */
+	public static function invalidate( string $product_slug, string $code ): bool {
+		if ('' === $code) {
+			return self::clear_lc_cache($product_slug);
+		}
+
+		/** @var array<string, string> $saved_codes 產品 key 和 code */
+		$saved_codes = \get_option(self::KEY, []);
+		$saved_codes = is_array($saved_codes) ? $saved_codes : []; // @phpstan-ignore-line
+		$saved_code  = (string) ( $saved_codes[ $product_slug ] ?? '' );
+
+		if ('' === $saved_code) {
+			return self::clear_lc_cache($product_slug);
+		}
+
+		if (\hash_equals($saved_code, $code)) {
+			return self::delete_lc_transient($product_slug);
+		}
+
+		Plugin::logger(
+			'lc/invalidate 帶來的授權碼與本站已存的不符，只清快取、不刪授權碼',
+			'warning',
+			[
+				'product_slug' => $product_slug,
+				'ip'           => \sanitize_text_field( \wp_unslash( (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) ) ), // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated
+			]
+		);
+		return self::clear_lc_cache($product_slug);
+	}
+
+	/**
 	 * 啟用授權碼
 	 *
 	 * @param string $code 授權碼
@@ -233,8 +290,18 @@ class Base {
 			return $data;
 		}
 
-		// 只有 401 才回 WP_Error，其他都直接 throw
+		// 只有「CloudServer 判定授權碼無效」的 401 才回 WP_Error，其他都直接 throw
 		// 因為後續處理中 WP_Error 會掉授權，其他種類 throw 會維持原本狀態
+		//
+		// 401 有兩種來源，靠 body 有沒有 `code` 區分：
+		// - CloudServer 的授權判定（碼無效、狀態不可啟用、網域不符）→ body 只有 `message`
+		// - WP REST 的認證／權限錯誤（rest_forbidden、incorrect_password…）→ body 帶 `code`
+		// 後者與授權碼本身無關，CloudServer 撤銷或更換 API 憑證時每個站都會同時收到；
+		// 若照舊當成「授權無效」，所有站會在下一次系統檢查時一起掉授權、要手動重輸授權碼
+		if (401 === $status_code && !empty($data['code'])) {
+			throw new \Exception($data['message'] ?? 'unknown error', $status_code); // @phpstan-ignore-line
+		}
+
 		if (401 === $status_code) {
 			return new \WP_Error($status_code, $data['message'] ?? 'unknown error');
 		}

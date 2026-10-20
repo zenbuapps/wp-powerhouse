@@ -643,10 +643,14 @@ class LicenseCodeTest extends TestCase {
 		$saved_codes = [ 'power-course' => self::TEST_CODE ];
 		\update_option( LCBase::KEY, $saved_codes );
 
+		// CloudServer 帶著本站已存的授權碼呼叫（不帶 code 只清快取，見 LicenseCodeInvalidateTest）
 		$response = $this->rest_request_as_guest(
 			'POST',
 			'/v2/powerhouse/lc/invalidate',
-			[ 'product_slug' => 'power-course' ]
+			[
+				'product_slug' => 'power-course',
+				'code'         => self::TEST_CODE,
+			]
 		);
 
 		$data = $response->get_data();
