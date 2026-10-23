@@ -10,7 +10,6 @@ export type TLC = {
 		| 'activated'
 		| 'deactivated'
 		| 'expired'
-		| 'bound_elsewhere'
 		| 'unauthorized'
 		| ''
 	expire_date: string | number
@@ -20,7 +19,7 @@ export type TLC = {
 	link: string
 	is_subscription?: boolean
 
-	/** 保留授權碼、但 CloudServer 判定未授權時的原因（status_expired、bound_elsewhere…） */
+	/** 保留授權碼、但 CloudServer 判定未授權時的原因（status_expired、status_deactivated、status_other） */
 	unauthorized_reason?: string
 }
 
@@ -51,11 +50,6 @@ const LC_STATUS_MAPPER = [
 		label: '已過期',
 	},
 	{
-		post_status: 'bound_elsewhere',
-		color: 'orange',
-		label: '已綁定其他網域',
-	},
-	{
 		post_status: 'unauthorized',
 		color: 'red',
 		label: '未授權',
@@ -69,8 +63,6 @@ const LC_STATUS_MAPPER = [
 const UNAUTHORIZED_MESSAGE_MAPPER: Record<string, string> = {
 	expired: '授權碼已過期，續約後系統會自動恢復授權，不需要重新輸入授權碼',
 	deactivated: '授權碼已停用，恢復後系統會自動重新啟用，不需要重新輸入授權碼',
-	bound_elsewhere:
-		'授權碼目前綁定在其他網域；若要改在本站使用，請先到該網域棄用授權，再按「重新啟用」',
 	unauthorized: '授權碼目前無法在本站使用，恢復後系統會自動重新啟用',
 }
 
@@ -94,7 +86,7 @@ const Card = ({ lc }: { lc: TLC }) => {
 		LC_STATUS_MAPPER.find((item) => item.post_status === post_status) ||
 		LC_STATUS_MAPPER[0]
 
-	// 有授權碼但不是已啟用 → 授權碼被保留、目前未授權（過期／停用／綁定其他網域）
+	// 有授權碼但不是已啟用 → 授權碼被保留、目前未授權（過期／停用）
 	const isUnauthorized = !!code && 'activated' !== post_status
 	const unauthorizedMessage =
 		UNAUTHORIZED_MESSAGE_MAPPER[post_status] ||

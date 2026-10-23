@@ -1,11 +1,12 @@
 <?php
 /**
- * 授權碼過期／停用／綁定其他網域時保留授權碼，恢復後自動回來（issue #14）
+ * 授權碼過期／停用時保留授權碼，恢復後自動回來（issue #14）
  *
  * CloudServer（power-partner-server）新版在 activate 判定失敗時回 401 + body `reason`：
- * - status_expired / status_deactivated / status_other / bound_elsewhere
+ * - status_expired / status_deactivated / status_other
  *   → 授權碼還是本站的，只是暫時不能用：保留已存的碼，寫一個「未授權」transient（6 小時後再檢查）
- * - not_found / product_mismatch / invalid_request，或沒有 reason（舊版 CloudServer）→ 照舊刪碼
+ * - not_found / product_mismatch / invalid_request / bound_elsewhere，或沒有 reason（舊版 CloudServer）→ 照舊刪碼
+ *   bound_elsewhere 代表客戶已搬站；保留的話，新網域之後釋出授權碼時，本站的系統檢查會把碼綁回自己
  *
  * lc/invalidate 帶 status：available 或沒帶 → 刪碼；其他 → 只清快取、保留碼
  * lc/refresh：碼相符 → 只清快取，讓下一次系統檢查重新 activate；不論任何情況都不刪碼
@@ -198,7 +199,6 @@ class LicenseCodeRetainTest extends TestCase {
 			'已過期'         => [ 'status_expired', 'expired' ],
 			'已停用'         => [ 'status_deactivated', 'deactivated' ],
 			'其他不可用狀態' => [ 'status_other', 'unauthorized' ],
-			'綁定其他網域'   => [ 'bound_elsewhere', 'bound_elsewhere' ],
 		];
 	}
 
@@ -239,6 +239,7 @@ class LicenseCodeRetainTest extends TestCase {
 			'碼不存在'                 => [ 'not_found' ],
 			'產品不符'                 => [ 'product_mismatch' ],
 			'請求無效'                 => [ 'invalid_request' ],
+			'已綁定其他網域（客戶已搬站）' => [ 'bound_elsewhere' ],
 			'舊版 CloudServer 沒有 reason' => [ null ],
 			'不認得的 reason'          => [ 'something_new' ],
 		];
@@ -343,6 +344,34 @@ class LicenseCodeRetainTest extends TestCase {
 	}
 
 	/**
+	 * 保留後重新檢查時，碼已綁到其他網域（客戶搬站）→ 刪除授權碼，之後不再用這組碼重新檢查
+	 *
+	 * @test
+	 * @group security
+	 */
+	public function 保留後重新檢查收到綁定其他網域時刪除授權碼且不再重打API(): void {
+		$this->given_saved_code_without_cache();
+		$this->respond_unauthorized( 'status_expired' );
+		$this->run_system_check();
+
+		$this->expire_cache();
+		$this->respond_unauthorized( 'bound_elsewhere' );
+		$found = $this->run_system_check();
+
+		$this->assertSame( '', $found['code'] );
+		$this->assertSame( '', $found['post_status'] );
+		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, $this->saved_codes() );
+		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, (array) \get_option( LCBase::UNAUTHORIZED_KEY, [] ) );
+
+		// 新網域之後把碼釋出成可用，本站也不會再用這組碼打 activate（打了就會被綁回本站）
+		$this->expire_cache();
+		$this->respond_activated();
+		$this->run_system_check();
+		$this->assertSame( 2, $this->activate_calls );
+		$this->assertFalse( LCBase::ia( self::PRODUCT_SLUG ) );
+	}
+
+	/**
 	 * @return array<string, array{0: array{status: int, body: array<string, mixed>}|\WP_Error}>
 	 */
 	public function transient_failures(): array {
@@ -440,7 +469,7 @@ class LicenseCodeRetainTest extends TestCase {
 	 */
 	public function 保留碼後手動重新啟用成功即恢復(): void {
 		$this->given_saved_code_without_cache();
-		$this->respond_unauthorized( 'bound_elsewhere' );
+		$this->respond_unauthorized( 'status_deactivated' );
 		$this->run_system_check();
 
 		$this->respond_activated();
@@ -466,7 +495,7 @@ class LicenseCodeRetainTest extends TestCase {
 	 */
 	public function 保留碼後手動重新啟用失敗時維持未授權(): void {
 		$this->given_saved_code_without_cache();
-		$this->respond_unauthorized( 'bound_elsewhere' );
+		$this->respond_unauthorized( 'status_deactivated' );
 		$this->run_system_check();
 
 		$response = $this->rest_request_as_admin(

@@ -41,14 +41,16 @@ class Base {
 	 * CloudServer 判定授權失敗的 reason 中，「授權碼本身仍屬於本站、之後可能恢復」的那些
 	 * → 保留已存的授權碼，只標記為未授權，恢復後下一次系統檢查自動變回已啟用
 	 *
-	 * 值是寫進 transient 的 post_status。不在這裡的 reason（not_found、product_mismatch、invalid_request），
+	 * 值是寫進 transient 的 post_status。不在這裡的 reason（not_found、product_mismatch、invalid_request、bound_elsewhere），
 	 * 以及沒有 reason 的舊版 CloudServer，照舊刪除授權碼
+	 *
+	 * ⛔ bound_elsewhere（授權碼已綁到其他網域）刻意不保留：那代表客戶已搬站，保留也不會恢復；
+	 * 而且本站會持續用這組碼重新檢查，一旦新網域把碼釋出成「可用」，系統檢查就會把碼綁回本站
 	 */
 	const RETAINED_REASONS = [
 		'status_expired'     => 'expired',
 		'status_deactivated' => 'deactivated',
 		'status_other'       => 'unauthorized',
-		'bound_elsewhere'    => 'bound_elsewhere',
 	];
 
 	/**
@@ -127,14 +129,14 @@ class Base {
 
 			// 如果啟用回得是 401 ，則使用預設的狀態
 			if ( \is_wp_error( $response ) ) {
-				// 授權碼過期／停用／綁定其他網域：碼仍是本站的，保留碼、標記未授權，恢復後自動回來
+				// 授權碼過期／停用：碼仍是本站的，保留碼、標記未授權，恢復後自動回來
 				$reason = self::get_error_reason($response);
 				if (isset(self::RETAINED_REASONS[ $reason ])) {
 					$lc_array[] = self::set_unauthorized_lc_transient($default_lc, (string) $saved_code, $reason);
 					continue;
 				}
 
-				// 碼不存在、產品不符、請求無效，或舊版 CloudServer 沒帶 reason → 照舊刪除授權碼
+				// 碼不存在、產品不符、請求無效、已綁定其他網域，或舊版 CloudServer 沒帶 reason → 照舊刪除授權碼
 				self::delete_lc_transient($product_slug);
 				$lc_array[] = $default_lc;
 				continue;
