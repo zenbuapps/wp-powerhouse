@@ -1,17 +1,27 @@
-import { Tag, Button, Space, Input } from 'antd'
+import { Tag, Button, Space, Input, Alert } from 'antd'
 import dayjs from 'dayjs'
 import { useState } from 'react'
 import { useCustomMutation, useApiUrl, useInvalidate } from '@refinedev/core'
 
 export type TLC = {
 	code: string
-	post_status: 'available' | 'activated' | 'deactivated' | 'expired' | ''
+	post_status:
+		| 'available'
+		| 'activated'
+		| 'deactivated'
+		| 'expired'
+		| 'bound_elsewhere'
+		| 'unauthorized'
+		| ''
 	expire_date: string | number
 	type: string
 	product_slug: string
 	product_name: string
 	link: string
 	is_subscription?: boolean
+
+	/** 保留授權碼、但 CloudServer 判定未授權時的原因（status_expired、bound_elsewhere…） */
+	unauthorized_reason?: string
 }
 
 const LC_STATUS_MAPPER = [
@@ -40,7 +50,29 @@ const LC_STATUS_MAPPER = [
 		color: 'gray',
 		label: '已過期',
 	},
+	{
+		post_status: 'bound_elsewhere',
+		color: 'orange',
+		label: '已綁定其他網域',
+	},
+	{
+		post_status: 'unauthorized',
+		color: 'red',
+		label: '未授權',
+	},
 ]
+
+/**
+ * 保留授權碼、但目前未授權時顯示的說明
+ * 授權碼仍存在本站，恢復後系統會自動重新啟用，不需要重新輸入
+ */
+const UNAUTHORIZED_MESSAGE_MAPPER: Record<string, string> = {
+	expired: '授權碼已過期，續約後系統會自動恢復授權，不需要重新輸入授權碼',
+	deactivated: '授權碼已停用，恢復後系統會自動重新啟用，不需要重新輸入授權碼',
+	bound_elsewhere:
+		'授權碼目前綁定在其他網域；若要改在本站使用，請先到該網域棄用授權，再按「重新啟用」',
+	unauthorized: '授權碼目前無法在本站使用，恢復後系統會自動重新啟用',
+}
 
 const Card = ({ lc }: { lc: TLC }) => {
 	const {
@@ -61,6 +93,51 @@ const Card = ({ lc }: { lc: TLC }) => {
 	const { color, label } =
 		LC_STATUS_MAPPER.find((item) => item.post_status === post_status) ||
 		LC_STATUS_MAPPER[0]
+
+	// 有授權碼但不是已啟用 → 授權碼被保留、目前未授權（過期／停用／綁定其他網域）
+	const isUnauthorized = !!code && 'activated' !== post_status
+	const unauthorizedMessage =
+		UNAUTHORIZED_MESSAGE_MAPPER[post_status] ||
+		UNAUTHORIZED_MESSAGE_MAPPER.unauthorized
+
+	const onSuccess = () => {
+		invalidate({
+			resource: 'lc',
+			invalidates: ['list'],
+		})
+	}
+
+	const handleActivate = (activateCode: string) => {
+		mutate(
+			{
+				url: `${apiUrl}/lc/activate`,
+				method: 'post',
+				values: {
+					product_slug,
+					code: activateCode,
+				},
+			},
+			{
+				onSuccess,
+			}
+		)
+	}
+
+	const handleDeactivate = () => {
+		mutate(
+			{
+				url: `${apiUrl}/lc/deactivate`,
+				method: 'post',
+				values: {
+					product_slug,
+					code,
+				},
+			},
+			{
+				onSuccess,
+			}
+		)
+	}
 
 	return (
 		<div
@@ -94,37 +171,48 @@ const Card = ({ lc }: { lc: TLC }) => {
 				<div>授權碼</div>
 				<div className="text-right">{code}</div>
 			</div>
-			{code ? (
+			{isUnauthorized && (
+				<>
+					<Alert
+						className="mt-4"
+						type="warning"
+						showIcon
+						message={unauthorizedMessage}
+					/>
+					<div className="mt-4 grid grid-cols-2 gap-2">
+						<Button
+							size="small"
+							type="primary"
+							loading={isLoading}
+							onClick={() => handleActivate(code)}
+						>
+							重新啟用
+						</Button>
+						<Button
+							size="small"
+							type="default"
+							danger
+							loading={isLoading}
+							onClick={handleDeactivate}
+						>
+							棄用授權
+						</Button>
+					</div>
+				</>
+			)}
+			{!!code && !isUnauthorized && (
 				<Button
 					size="small"
 					type="default"
 					danger
 					className="mt-4 w-full"
 					loading={isLoading}
-					onClick={() => {
-						mutate(
-							{
-								url: `${apiUrl}/lc/deactivate`,
-								method: 'post',
-								values: {
-									product_slug,
-									code,
-								},
-							},
-							{
-								onSuccess: () => {
-									invalidate({
-										resource: 'lc',
-										invalidates: ['list'],
-									})
-								},
-							},
-						)
-					}}
+					onClick={handleDeactivate}
 				>
 					棄用授權
 				</Button>
-			) : (
+			)}
+			{!code && (
 				<Space.Compact block className="mt-4">
 					<Input
 						placeholder="請輸入授權碼 xxxxxx-xxxxxx-xxxxxx-xxxxxx"
@@ -139,26 +227,7 @@ const Card = ({ lc }: { lc: TLC }) => {
 						type="primary"
 						className="text-xs px-3"
 						loading={isLoading}
-						onClick={() => {
-							mutate(
-								{
-									url: `${apiUrl}/lc/activate`,
-									method: 'post',
-									values: {
-										product_slug,
-										code: inputCode,
-									},
-								},
-								{
-									onSuccess: () => {
-										invalidate({
-											resource: 'lc',
-											invalidates: ['list'],
-										})
-									},
-								},
-							)
-						}}
+						onClick={() => handleActivate(inputCode)}
 					>
 						啟用
 					</Button>
