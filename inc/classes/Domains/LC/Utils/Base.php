@@ -475,6 +475,27 @@ class Base {
 	}
 
 	/**
+	 * 重新檢查授權（授權頁面的「重新檢查授權」）
+	 *
+	 * 清除快取後重跑一次系統檢查（get_lc_array()，activate 帶 is_system_check = true），結果與定期驗證完全相同：
+	 * 恢復成已啟用、繼續保留（status_*），或刪碼（released、bound_elsewhere、not_found…）。
+	 * ⛔ 不可改用使用者主動啟用（is_system_check = false）：CloudServer 只有系統檢查才不綁定「可用」的碼，
+	 * 用主動啟用的語意重新送出，已釋出的碼會被重新綁到本站
+	 *
+	 * @param string $product_slug 產品 slug
+	 * @return array{code: string, post_status: string, expire_date: string, type: string, product_slug: string, product_name: string, unauthorized_reason?: string}|null 重新檢查後的授權狀態，產品未註冊時為 null
+	 */
+	public static function recheck( string $product_slug ): ?array {
+		self::clear_lc_cache($product_slug);
+		foreach (self::get_lc_array() as $lc) {
+			if ($lc['product_slug'] === $product_slug) {
+				return $lc;
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * 取得本站已存的授權碼
 	 *
 	 * @param string $product_slug 產品 slug
@@ -604,7 +625,7 @@ class Base {
 	 *
 	 * @param string $code 授權碼
 	 * @param string $product_slug 產品 key
-	 * @return array{message: string}|array{code: string, message: string, data: array{status: int}} $data 成功|失敗
+	 * @return array{message: string, local_only?: bool}|array{code: string, message: string, data: array{status: int}} $data 成功|失敗；local_only 表示只從本站移除（CloudServer 回 409）
 	 * @throws \Exception 如果棄用失敗，則拋出例外。
 	 */
 	public static function deactivate( string $code, string $product_slug = '' ): array {
@@ -637,10 +658,11 @@ class Base {
 		self::delete_lc_transient($product_slug);
 
 		// 409：CloudServer 上這組碼目前不是已啟用（過期、停用…），無需棄用。
-		// 本站的授權碼上面已經移除，對使用者來說「從本站棄用」已經完成，回成功讓畫面更新
+		// 本站的授權碼上面已經移除，仍算成功讓畫面更新；但雲端的綁定沒有變更，訊息要講清楚
 		if (409 === $status_code) {
 			return [
-				'message' => $data['message'] ?? '授權碼已從本站移除', // @phpstan-ignore-line
+				'message'    => '授權碼已從本站移除（雲端的綁定未變更）',
+				'local_only' => true,
 			];
 		}
 

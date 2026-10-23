@@ -115,6 +115,26 @@ const Card = ({ lc }: { lc: TLC }) => {
 		)
 	}
 
+	// 重新檢查授權：以系統檢查的語意重跑（lc/recheck），不是用同一組碼主動啟用
+	const handleRecheck = () => {
+		mutate(
+			{
+				url: `${apiUrl}/lc/recheck`,
+				method: 'post',
+				values: {
+					product_slug,
+				},
+				successNotification: (data) => ({
+					message: data?.data?.message || '已重新檢查授權',
+					type: 'success',
+				}),
+			},
+			{
+				onSuccess,
+			}
+		)
+	}
+
 	const handleDeactivate = () => {
 		mutate(
 			{
@@ -124,6 +144,10 @@ const Card = ({ lc }: { lc: TLC }) => {
 					product_slug,
 					code,
 				},
+				successNotification: (data) => ({
+					message: data?.data?.message || '棄用成功',
+					type: 'success',
+				}),
 			},
 			{
 				onSuccess,
@@ -176,9 +200,9 @@ const Card = ({ lc }: { lc: TLC }) => {
 							size="small"
 							type="primary"
 							loading={isLoading}
-							onClick={() => handleActivate(code)}
+							onClick={handleRecheck}
 						>
-							重新啟用
+							重新檢查授權
 						</Button>
 						<Button
 							size="small"

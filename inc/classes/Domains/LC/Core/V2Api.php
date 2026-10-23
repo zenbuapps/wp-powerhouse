@@ -42,6 +42,11 @@ final class V2Api extends ApiBase {
 			'permission_callback' => null,
 		],
 		[
+			'endpoint'            => 'lc/recheck',
+			'method'              => 'post',
+			'permission_callback' => null,
+		],
+		[
 			'endpoint'            => 'lc/invalidate',
 			'method'              => 'post',
 			'permission_callback' => '__return_true',
@@ -131,11 +136,52 @@ final class V2Api extends ApiBase {
 		return new \WP_REST_Response(
 			[
 				'code'    => 'deactivate_lc_success',
-				'message' => "授權碼 《{$code}》 棄用成功",
+				'message' => empty( $result['local_only'] ) ? "授權碼 《{$code}》 棄用成功" : "授權碼 《{$code}》 已從本站移除（雲端的綁定未變更）",
 				'data'    => $result,
 			],
 			200
 			);
+	}
+
+	/**
+	 * 重新檢查授權（授權頁面的「重新檢查授權」）
+	 *
+	 * 以系統檢查的語意重跑一次，見 Base::recheck()；不是使用者主動啟用
+	 *
+	 * @param \WP_REST_Request $request REST請求對象。
+	 * @return \WP_REST_Response 返回包含重新檢查結果的REST響應對象。
+	 */
+	public function post_lc_recheck_callback( \WP_REST_Request $request ): \WP_REST_Response {
+		$body_params  = (array) $request->get_json_params();
+		$product_slug = \is_string( $body_params['product_slug'] ?? null ) ? $body_params['product_slug'] : '';
+
+		$lc = '' === $product_slug ? null : Base::recheck( $product_slug );
+		if ( null === $lc ) {
+			return new \WP_REST_Response(
+				[
+					'code'    => 'recheck_lc_failed',
+					'message' => '找不到這個產品的授權',
+				],
+				404
+			);
+		}
+
+		if ( 'activated' === $lc['post_status'] ) {
+			$message = '授權已恢復啟用';
+		} elseif ( '' !== $lc['code'] ) {
+			$message = '授權碼目前仍無法在本站使用，恢復後系統會自動重新啟用';
+		} else {
+			$message = '授權碼已無法在本站使用，已從本站移除';
+		}
+
+		return new \WP_REST_Response(
+			[
+				'code'    => 'recheck_lc_success',
+				'message' => $message,
+				'data'    => $lc,
+			],
+			200
+		);
 	}
 
 

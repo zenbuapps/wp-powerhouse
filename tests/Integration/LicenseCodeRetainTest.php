@@ -32,13 +32,21 @@ class LicenseCodeRetainTest extends TestCase {
 	/** @var int 打 license-codes/activate 的次數 */
 	private int $activate_calls = 0;
 
-	/** @var array{status: int, body: array<string, mixed>}|\WP_Error|null 下一次 activate 的回應 */
+	/**
+	 * 下一次 activate 的回應；callable 時以請求參數決定回應（模擬 CloudServer 依 is_system_check 判斷）
+	 *
+	 * @var array{status: int, body: array<string, mixed>}|\WP_Error|callable|null
+	 */
 	private $activate_response = null;
+
+	/** @var array<int, array<string, mixed>> 每次打 activate 的請求參數 */
+	private array $activate_requests = [];
 
 	public function set_up(): void {
 		parent::set_up();
 		$this->activate_calls    = 0;
 		$this->activate_response = null;
+		$this->activate_requests = [];
 
 		\add_filter(
 			'pre_http_request',
@@ -53,18 +61,23 @@ class LicenseCodeRetainTest extends TestCase {
 					return $preempt;
 				}
 				++$this->activate_calls;
-				if ( \is_wp_error( $this->activate_response ) ) {
-					return $this->activate_response;
+				$params                    = json_decode( (string) ( $args['body'] ?? '' ), true );
+				$params                    = is_array( $params ) ? $params : [];
+				$this->activate_requests[] = $params;
+
+				$activate_response = is_callable( $this->activate_response ) ? ( $this->activate_response )( $params ) : $this->activate_response;
+				if ( \is_wp_error( $activate_response ) ) {
+					return $activate_response;
 				}
-				if ( null === $this->activate_response ) {
+				if ( null === $activate_response ) {
 					return new \WP_Error( 'http_request_failed', '測試沒有設定 activate 回應' );
 				}
 				return [
 					'response' => [
-						'code'    => $this->activate_response['status'],
+						'code'    => $activate_response['status'],
 						'message' => '',
 					],
-					'body'     => (string) \wp_json_encode( $this->activate_response['body'] ),
+					'body'     => (string) \wp_json_encode( $activate_response['body'] ),
 					'headers'  => [],
 				];
 			},
@@ -720,6 +733,8 @@ class LicenseCodeRetainTest extends TestCase {
 
 		$this->assertSame( 200, $response->get_status(), '本站的碼已移除，對使用者來說棄用已完成' );
 		$this->assertSame( 'deactivate_lc_success', $response->get_data()['code'] ?? null );
+		$this->assertStringContainsString( '已從本站移除', (string) ( $response->get_data()['message'] ?? '' ) );
+		$this->assertStringContainsString( '雲端的綁定未變更', (string) ( $response->get_data()['message'] ?? '' ), '不可讓使用者以為雲端的綁定也解除了' );
 		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, $this->saved_codes() );
 		$this->assertFalse( \get_transient( 'lc_' . self::PRODUCT_SLUG ) );
 		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, (array) \get_option( LCBase::UNAUTHORIZED_KEY, [] ) );
@@ -753,6 +768,181 @@ class LicenseCodeRetainTest extends TestCase {
 		$response = $this->deactivate_with( 500, [ 'message' => 'Internal Server Error' ] );
 
 		$this->assertGreaterThanOrEqual( 400, $response->get_status() );
+	}
+
+	/**
+	 * 對照組：CloudServer 棄用成功（200）時維持原本的「棄用成功」訊息
+	 *
+	 * @test
+	 * @group happy
+	 */
+	public function 棄用成功時訊息維持棄用成功(): void {
+		$this->given_activated_code();
+
+		$response = $this->deactivate_with( 200, [ 'message' => 'deactivated' ] );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertStringContainsString( '棄用成功', (string) ( $response->get_data()['message'] ?? '' ) );
+		$this->assertStringNotContainsString( '雲端的綁定未變更', (string) ( $response->get_data()['message'] ?? '' ) );
+	}
+
+	// ========== 重新檢查授權（lc/recheck） ==========
+
+	/**
+	 * 模擬 CloudServer：碼已被改成「可用」
+	 * 系統檢查不綁定 → 401 released；使用者主動啟用 → 綁定到請求的網域（200）
+	 */
+	private function given_server_code_is_available(): void {
+		$this->activate_response = function ( array $params ) {
+			if ( ! empty( $params['is_system_check'] ) ) {
+				return [
+					'status' => 401,
+					'body'   => [
+						'message' => '《' . self::SAVED_CODE . '》 目前為可用狀態，系統檢查不綁定',
+						'reason'  => 'released',
+					],
+				];
+			}
+			return [
+				'status' => 200,
+				'body'   => [
+					'id'           => 1,
+					'post_status'  => 'activated',
+					'code'         => self::SAVED_CODE,
+					'type'         => 'standard',
+					'expire_date'  => 0,
+					'domain'       => 'example.org',
+					'product_id'   => 1,
+					'product_slug' => self::PRODUCT_SLUG,
+					'product_name' => 'Power Course',
+				],
+			];
+		};
+	}
+
+	/**
+	 * @return \WP_REST_Response
+	 */
+	private function recheck(): \WP_REST_Response {
+		return $this->rest_request_as_admin( 'POST', '/v2/powerhouse/lc/recheck', [ 'product_slug' => self::PRODUCT_SLUG ] );
+	}
+
+	/**
+	 * @test
+	 * @group smoke
+	 */
+	public function recheck_端點應已被註冊(): void {
+		$this->assert_rest_route_registered( '/v2/powerhouse/lc/recheck' );
+	}
+
+	/**
+	 * ⛔ 保留中的碼已在雲端被改成可用：重新檢查以系統檢查的語意送出 → 不綁定、本站刪碼
+	 *
+	 * @test
+	 * @group security
+	 */
+	public function recheck_碼已被改成可用時不綁定且本站刪碼(): void {
+		$this->given_saved_code_without_cache();
+		$this->respond_unauthorized( 'status_expired' );
+		$this->run_system_check();
+
+		$this->given_server_code_is_available();
+		$response = $this->recheck();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertTrue( (bool) ( end( $this->activate_requests )['is_system_check'] ?? false ), '重新檢查必須是系統檢查，不是使用者主動啟用' );
+		$this->assertSame( '', $response->get_data()['data']['code'] ?? null );
+		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, $this->saved_codes(), '已釋出的碼不可留在本站' );
+		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, (array) \get_option( LCBase::UNAUTHORIZED_KEY, [] ) );
+		$this->assertFalse( LCBase::ia( self::PRODUCT_SLUG ), '已釋出的碼不可被綁回本站' );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function recheck_CloudServer_判定已恢復時恢復已啟用(): void {
+		$this->given_saved_code_without_cache();
+		$this->respond_unauthorized( 'status_expired' );
+		$this->run_system_check();
+
+		$this->respond_activated();
+		$response = $this->recheck();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'activated', $response->get_data()['data']['post_status'] ?? null );
+		$this->assertSame( '授權已恢復啟用', $response->get_data()['message'] ?? null );
+		$this->assertTrue( LCBase::ia( self::PRODUCT_SLUG ) );
+		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, (array) \get_option( LCBase::UNAUTHORIZED_KEY, [] ) );
+	}
+
+	/**
+	 * @test
+	 * @group happy
+	 */
+	public function recheck_仍然過期時繼續保留(): void {
+		$this->given_saved_code_without_cache();
+		$this->respond_unauthorized( 'status_expired' );
+		$this->run_system_check();
+
+		$response = $this->recheck();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 2, $this->activate_calls, '重新檢查要清快取、真的重打一次 activate' );
+		$this->assertSame( 'expired', $response->get_data()['data']['post_status'] ?? null );
+		$this->assertSame( self::SAVED_CODE, $this->saved_codes()[ self::PRODUCT_SLUG ] ?? null );
+		$this->assertFalse( LCBase::ia( self::PRODUCT_SLUG ) );
+	}
+
+	/**
+	 * @test
+	 * @group security
+	 */
+	public function recheck_需要管理員權限(): void {
+		$this->given_saved_code_without_cache();
+		$this->respond_unauthorized( 'status_expired' );
+		$this->run_system_check();
+
+		$response = $this->rest_request_as_guest( 'POST', '/v2/powerhouse/lc/recheck', [ 'product_slug' => self::PRODUCT_SLUG ] );
+
+		$this->assertContains( $response->get_status(), [ 401, 403 ] );
+		$this->assertSame( 1, $this->activate_calls );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function recheck_產品未註冊時回404(): void {
+		$this->register_lc_product( self::PRODUCT_SLUG, 'Power Course' );
+
+		$response = $this->rest_request_as_admin( 'POST', '/v2/powerhouse/lc/recheck', [ 'product_slug' => 'not-registered' ] );
+
+		$this->assertSame( 404, $response->get_status() );
+	}
+
+	/**
+	 * 對照組：手動輸入授權碼仍是使用者主動啟用（is_system_check = false）
+	 *
+	 * @test
+	 * @group happy
+	 */
+	public function 手動輸入授權碼維持使用者主動啟用(): void {
+		$this->register_lc_product( self::PRODUCT_SLUG, 'Power Course' );
+		$this->given_server_code_is_available();
+
+		$response = $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/activate',
+			[
+				'code'         => self::SAVED_CODE,
+				'product_slug' => self::PRODUCT_SLUG,
+			]
+		);
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertFalse( (bool) ( end( $this->activate_requests )['is_system_check'] ?? true ) );
+		$this->assertTrue( LCBase::ia( self::PRODUCT_SLUG ) );
 	}
 
 	// ========== lc/invalidate 依 status 處理 ==========
