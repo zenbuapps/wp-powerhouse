@@ -240,6 +240,7 @@ class LicenseCodeRetainTest extends TestCase {
 			'產品不符'                 => [ 'product_mismatch' ],
 			'請求無效'                 => [ 'invalid_request' ],
 			'已綁定其他網域（客戶已搬站）' => [ 'bound_elsewhere' ],
+			'可用的碼不綁定（已釋出）'     => [ 'released' ],
 			'舊版 CloudServer 沒有 reason' => [ null ],
 			'不認得的 reason'          => [ 'something_new' ],
 		];
@@ -369,6 +370,160 @@ class LicenseCodeRetainTest extends TestCase {
 		$this->run_system_check();
 		$this->assertSame( 2, $this->activate_calls );
 		$this->assertFalse( LCBase::ia( self::PRODUCT_SLUG ) );
+	}
+
+	/**
+	 * 保留後重新檢查時，碼已被釋出成可用（CloudServer 系統檢查不綁定可用的碼，回 released）→ 刪碼、清除未授權紀錄
+	 *
+	 * @test
+	 * @group happy
+	 */
+	public function 保留後重新檢查收到_released_時刪除授權碼並清除未授權紀錄(): void {
+		$this->given_saved_code_without_cache();
+		$this->respond_unauthorized( 'status_expired' );
+		$this->run_system_check();
+		$this->assertArrayHasKey( self::PRODUCT_SLUG, (array) \get_option( LCBase::UNAUTHORIZED_KEY, [] ) );
+
+		$this->expire_cache();
+		$this->respond_unauthorized( 'released' );
+		$found = $this->run_system_check();
+
+		$this->assertSame( '', $found['code'] );
+		$this->assertSame( '', $found['post_status'] );
+		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, $this->saved_codes() );
+		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, (array) \get_option( LCBase::UNAUTHORIZED_KEY, [] ) );
+		$this->assertFalse( LCBase::ia( self::PRODUCT_SLUG ) );
+	}
+
+	// ========== 長期未恢復時的退避 ==========
+
+	/**
+	 * 把未授權紀錄的「第一次標記時間」改到過去
+	 *
+	 * @param string $reason  reason
+	 * @param int    $seconds 幾秒前
+	 */
+	private function given_unauthorized_since( string $reason, int $seconds ): void {
+		\update_option(
+			LCBase::UNAUTHORIZED_KEY,
+			[
+				self::PRODUCT_SLUG => [
+					'code'   => self::SAVED_CODE,
+					'reason' => $reason,
+					'at'     => time() - $seconds,
+				],
+			],
+			false
+		);
+	}
+
+	/**
+	 * @return array<string, array{0: string}>
+	 */
+	public function backoff_reasons(): array {
+		return [
+			'已過期'         => [ 'status_expired' ],
+			'已停用'         => [ 'status_deactivated' ],
+			'其他不可用狀態' => [ 'status_other' ],
+		];
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 * @dataProvider backoff_reasons
+	 *
+	 * @param string $reason CloudServer 回的 reason
+	 */
+	public function 保留超過7天仍未恢復時_改成24小時檢查一次( string $reason ): void {
+		$this->given_saved_code_without_cache();
+		$this->given_unauthorized_since( $reason, LCBase::UNAUTHORIZED_BACKOFF_AFTER + HOUR_IN_SECONDS );
+		$this->respond_unauthorized( $reason );
+
+		$found = $this->run_system_check();
+
+		$this->assertSame( self::SAVED_CODE, $found['code'], '退避期間仍保留授權碼' );
+		$this->assertFalse( LCBase::ia( self::PRODUCT_SLUG ) );
+		$ttl = $this->transient_ttl();
+		$this->assertLessThanOrEqual( LCBase::UNAUTHORIZED_BACKOFF_TTL, $ttl );
+		$this->assertGreaterThan( LCBase::UNAUTHORIZED_BACKOFF_TTL - 60, $ttl, '保留超過 7 天改成 24 小時檢查一次' );
+	}
+
+	/**
+	 * @test
+	 * @group edge
+	 */
+	public function 保留未滿7天時維持6小時檢查一次(): void {
+		$this->given_saved_code_without_cache();
+		$this->given_unauthorized_since( 'status_expired', LCBase::UNAUTHORIZED_BACKOFF_AFTER - HOUR_IN_SECONDS );
+		$this->respond_unauthorized( 'status_expired' );
+
+		$this->run_system_check();
+
+		$ttl = $this->transient_ttl();
+		$this->assertLessThanOrEqual( LCBase::UNAUTHORIZED_RECHECK_TTL, $ttl );
+		$this->assertGreaterThan( LCBase::UNAUTHORIZED_RECHECK_TTL - 60, $ttl );
+	}
+
+	/**
+	 * 退避也適用於「重新檢查遇到暫時性錯誤、依未授權紀錄維持未授權」的路徑
+	 *
+	 * @test
+	 * @group edge
+	 */
+	public function 保留超過7天時_暫時性錯誤也改成24小時檢查一次(): void {
+		$this->given_saved_code_without_cache();
+		$this->given_unauthorized_since( 'status_other', LCBase::UNAUTHORIZED_BACKOFF_AFTER + HOUR_IN_SECONDS );
+		$this->activate_response = new \WP_Error( 'http_request_failed', 'cURL error 28' );
+
+		$found = $this->run_system_check();
+
+		$this->assertSame( 'unauthorized', $found['post_status'] );
+		$this->assertGreaterThan( LCBase::UNAUTHORIZED_BACKOFF_TTL - 60, $this->transient_ttl() );
+	}
+
+	/**
+	 * 第一次標記時間不因 reason 改變而重設（例如過期 → 停用），退避照樣生效
+	 *
+	 * @test
+	 * @group edge
+	 */
+	public function reason_改變時不重設第一次標記時間(): void {
+		$this->given_saved_code_without_cache();
+		$since = LCBase::UNAUTHORIZED_BACKOFF_AFTER + HOUR_IN_SECONDS;
+		$this->given_unauthorized_since( 'status_expired', $since );
+		$this->respond_unauthorized( 'status_deactivated' );
+
+		$found = $this->run_system_check();
+
+		$this->assertSame( 'deactivated', $found['post_status'] );
+		/** @var array<string, array{code: string, reason: string, at: int}> $records */
+		$records = \get_option( LCBase::UNAUTHORIZED_KEY, [] );
+		$this->assertSame( 'status_deactivated', $records[ self::PRODUCT_SLUG ]['reason'] );
+		$this->assertLessThanOrEqual( time() - $since, $records[ self::PRODUCT_SLUG ]['at'] );
+		$this->assertGreaterThan( LCBase::UNAUTHORIZED_BACKOFF_TTL - 60, $this->transient_ttl() );
+	}
+
+	/**
+	 * 恢復後再次未授權，從新的時間點重新起算（回到 6 小時）
+	 *
+	 * @test
+	 * @group edge
+	 */
+	public function 恢復後再次未授權時重新起算(): void {
+		$this->given_saved_code_without_cache();
+		$this->given_unauthorized_since( 'status_expired', LCBase::UNAUTHORIZED_BACKOFF_AFTER + HOUR_IN_SECONDS );
+		$this->respond_activated();
+		$this->run_system_check();
+		$this->assertTrue( LCBase::ia( self::PRODUCT_SLUG ) );
+
+		$this->expire_cache();
+		$this->respond_unauthorized( 'status_expired' );
+		$this->run_system_check();
+
+		$ttl = $this->transient_ttl();
+		$this->assertLessThanOrEqual( LCBase::UNAUTHORIZED_RECHECK_TTL, $ttl );
+		$this->assertGreaterThan( LCBase::UNAUTHORIZED_RECHECK_TTL - 60, $ttl );
 	}
 
 	/**
@@ -513,7 +668,45 @@ class LicenseCodeRetainTest extends TestCase {
 	}
 
 	/**
-	 * 使用者主動棄用：仍刪除授權碼（含未授權紀錄）
+	 * 棄用：攔截 license-codes/deactivate 並回指定回應，送出 lc/deactivate
+	 *
+	 * @param int                  $status HTTP status
+	 * @param array<string, mixed> $body   回應 body
+	 * @return \WP_REST_Response
+	 */
+	private function deactivate_with( int $status, array $body ): \WP_REST_Response {
+		$this->stub_http_request(
+			'power-partner-server/license-codes/deactivate',
+			[
+				'response' => [
+					'code'    => $status,
+					'message' => '',
+				],
+				'body'     => (string) \wp_json_encode( $body ),
+				'headers'  => [],
+			]
+		);
+		return $this->rest_request_as_admin(
+			'POST',
+			'/v2/powerhouse/lc/deactivate',
+			[
+				'code'         => self::SAVED_CODE,
+				'product_slug' => self::PRODUCT_SLUG,
+			]
+		);
+	}
+
+	/**
+	 * CloudServer 對「不是已啟用」的碼棄用時的實際回應（409）
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function not_activated_409_body(): array {
+		return [ 'message' => '《' . self::SAVED_CODE . '》 目前不是已啟用狀態，無需棄用' ];
+	}
+
+	/**
+	 * 使用者主動棄用保留中的碼：CloudServer 回 409（碼不是已啟用），本站仍刪除授權碼（含未授權紀錄）並回成功
 	 *
 	 * @test
 	 * @group happy
@@ -523,30 +716,43 @@ class LicenseCodeRetainTest extends TestCase {
 		$this->respond_unauthorized( 'status_expired' );
 		$this->run_system_check();
 
-		$this->stub_http_request(
-			'power-partner-server/license-codes/deactivate',
-			[
-				'response' => [
-					'code'    => 200,
-					'message' => 'OK',
-				],
-				'body'     => (string) \wp_json_encode( [ 'message' => 'deactivated' ] ),
-				'headers'  => [],
-			]
-		);
-		$response = $this->rest_request_as_admin(
-			'POST',
-			'/v2/powerhouse/lc/deactivate',
-			[
-				'code'         => self::SAVED_CODE,
-				'product_slug' => self::PRODUCT_SLUG,
-			]
-		);
+		$response = $this->deactivate_with( 409, $this->not_activated_409_body() );
 
-		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 200, $response->get_status(), '本站的碼已移除，對使用者來說棄用已完成' );
+		$this->assertSame( 'deactivate_lc_success', $response->get_data()['code'] ?? null );
 		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, $this->saved_codes() );
 		$this->assertFalse( \get_transient( 'lc_' . self::PRODUCT_SLUG ) );
 		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, (array) \get_option( LCBase::UNAUTHORIZED_KEY, [] ) );
+	}
+
+	/**
+	 * 本站快取是已啟用、CloudServer 上卻已不是已啟用（例如剛過期、快取還沒到期）→ 409 同樣視為從本站移除成功
+	 *
+	 * @test
+	 * @group happy
+	 */
+	public function 已啟用的碼棄用收到409時視為從本站移除成功(): void {
+		$this->given_activated_code();
+
+		$response = $this->deactivate_with( 409, $this->not_activated_409_body() );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertArrayNotHasKey( self::PRODUCT_SLUG, $this->saved_codes() );
+		$this->assertFalse( LCBase::ia( self::PRODUCT_SLUG ) );
+	}
+
+	/**
+	 * 對照組：409 以外的失敗（例如 500）維持既有行為，回錯誤給操作者
+	 *
+	 * @test
+	 * @group error
+	 */
+	public function 棄用收到409以外的失敗時照舊回錯誤(): void {
+		$this->given_activated_code();
+
+		$response = $this->deactivate_with( 500, [ 'message' => 'Internal Server Error' ] );
+
+		$this->assertGreaterThanOrEqual( 400, $response->get_status() );
 	}
 
 	// ========== lc/invalidate 依 status 處理 ==========
@@ -725,7 +931,6 @@ class LicenseCodeRetainTest extends TestCase {
 		);
 
 		$this->assertSame( 200, $response->get_status() );
-		$this->assertSame( [ 'refreshed' => true ], $response->get_data() );
 		$this->assertFalse( \get_transient( 'lc_' . self::PRODUCT_SLUG ), '快取應被清除' );
 		$this->assertSame( self::SAVED_CODE, $this->saved_codes()[ self::PRODUCT_SLUG ] ?? null );
 
@@ -779,9 +984,38 @@ class LicenseCodeRetainTest extends TestCase {
 		$response = $this->rest_request_as_guest( 'POST', '/powerhouse/lc/refresh', $body );
 
 		$this->assertSame( 200, $response->get_status() );
-		$this->assertSame( [ 'refreshed' => false ], $response->get_data() );
 		$this->assertSame( $before, \get_transient( 'lc_' . self::PRODUCT_SLUG ), '快取不可被動到' );
 		$this->assertSame( [ self::PRODUCT_SLUG => self::SAVED_CODE ], $this->saved_codes() );
+	}
+
+	/**
+	 * refresh 的回應不可透露授權碼是否相符：相符與不符的回應完全相同
+	 *
+	 * @test
+	 * @group security
+	 */
+	public function refresh_碼相符與不符的回應相同(): void {
+		$this->given_activated_code();
+
+		$matched  = $this->rest_request_as_guest(
+			'POST',
+			'/powerhouse/lc/refresh',
+			[
+				'product_slug' => self::PRODUCT_SLUG,
+				'code'         => self::SAVED_CODE,
+			]
+		);
+		$rejected = $this->rest_request_as_guest(
+			'POST',
+			'/powerhouse/lc/refresh',
+			[
+				'product_slug' => self::PRODUCT_SLUG,
+				'code'         => 'WRONG-CODE-0000-0000',
+			]
+		);
+
+		$this->assertSame( $matched->get_status(), $rejected->get_status() );
+		$this->assertSame( $matched->get_data(), $rejected->get_data() );
 	}
 
 	/**

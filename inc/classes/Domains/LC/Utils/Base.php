@@ -37,6 +37,15 @@ class Base {
 	/** 保留授權碼的未授權狀態多久後重新檢查一次 */
 	const UNAUTHORIZED_RECHECK_TTL = 6 * HOUR_IN_SECONDS;
 
+	/** 保留超過這麼久（從第一次標記未授權起算）仍未恢復，重新檢查的間隔改成 UNAUTHORIZED_BACKOFF_TTL */
+	const UNAUTHORIZED_BACKOFF_AFTER = 7 * DAY_IN_SECONDS;
+
+	/**
+	 * 長期未恢復時的重新檢查間隔
+	 * 不會停止檢查：保留授權碼本來就是為了等續約，續約後要能自己恢復
+	 */
+	const UNAUTHORIZED_BACKOFF_TTL = 24 * HOUR_IN_SECONDS;
+
 	/**
 	 * CloudServer 判定授權失敗的 reason 中，「授權碼本身仍屬於本站、之後可能恢復」的那些
 	 * → 保留已存的授權碼，只標記為未授權，恢復後下一次系統檢查自動變回已啟用
@@ -212,6 +221,7 @@ class Base {
 	 *
 	 * 以預設 lc 為底填入授權碼，post_status 依 reason 對應（見 RETAINED_REASONS），
 	 * TTL 只有 UNAUTHORIZED_RECHECK_TTL：到期後系統檢查會再用同一組碼打 activate，成功即自動恢復成已啟用。
+	 * 從第一次標記未授權起超過 UNAUTHORIZED_BACKOFF_AFTER 仍未恢復，改成 UNAUTHORIZED_BACKOFF_TTL（不分 reason）。
 	 * post_status 不是 activated，所以 ia() 一律判定未授權
 	 *
 	 * @param array{code: string, post_status: string, expire_date: string, type: string, product_slug: string, product_name: string} $default_lc 預設 lc，見 get_default_lc()
@@ -225,9 +235,23 @@ class Base {
 		$lc['post_status']         = self::RETAINED_REASONS[ $reason ] ?? 'unauthorized';
 		$lc['unauthorized_reason'] = $reason;
 
-		self::set_lc_transient($lc, self::UNAUTHORIZED_RECHECK_TTL);
 		self::mark_unauthorized($lc['product_slug'], $code, $reason);
+		self::set_lc_transient($lc, self::get_unauthorized_recheck_ttl($lc['product_slug']));
 		return $lc;
+	}
+
+	/**
+	 * 保留授權碼的未授權狀態，下一次重新檢查的間隔（退避）
+	 *
+	 * @param string $product_slug 產品 slug
+	 * @return int 秒數
+	 */
+	public static function get_unauthorized_recheck_ttl( string $product_slug ): int {
+		$record = self::get_unauthorized_records()[ $product_slug ] ?? null;
+		if (null !== $record && $record['at'] > 0 && ( time() - $record['at'] ) >= self::UNAUTHORIZED_BACKOFF_AFTER) {
+			return self::UNAUTHORIZED_BACKOFF_TTL;
+		}
+		return self::UNAUTHORIZED_RECHECK_TTL;
 	}
 
 	/**
@@ -273,22 +297,25 @@ class Base {
 	/**
 	 * 記錄產品目前「保留授權碼、但未授權」
 	 *
+	 * 欄位 at 是這組碼第一次被標記未授權的時間（退避用）：同一組碼之後 reason 改變也不重設
+	 *
 	 * @param string $product_slug 產品 slug
 	 * @param string $code         授權碼
 	 * @param string $reason       reason，RETAINED_REASONS 的 key
 	 * @return void
 	 */
 	public static function mark_unauthorized( string $product_slug, string $code, string $reason ): void {
-		$records = self::get_unauthorized_records();
-		$record  = $records[ $product_slug ] ?? null;
-		if (null !== $record && $record['code'] === $code && $record['reason'] === $reason) {
+		$records   = self::get_unauthorized_records();
+		$record    = $records[ $product_slug ] ?? null;
+		$same_code = null !== $record && $record['code'] === $code;
+		if ($same_code && $record['reason'] === $reason) {
 			return;
 		}
 
 		$records[ $product_slug ] = [
 			'code'   => $code,
 			'reason' => $reason,
-			'at'     => time(),
+			'at'     => $same_code && $record['at'] > 0 ? $record['at'] : time(),
 		];
 		\update_option(self::UNAUTHORIZED_KEY, $records, false);
 	}
@@ -608,6 +635,14 @@ class Base {
 		\J7\WpUtils\Classes\WC::log($product_slug, 'delete_lc_transient from deactivate');
 		// ---------- END TEST ---------- //
 		self::delete_lc_transient($product_slug);
+
+		// 409：CloudServer 上這組碼目前不是已啟用（過期、停用…），無需棄用。
+		// 本站的授權碼上面已經移除，對使用者來說「從本站棄用」已經完成，回成功讓畫面更新
+		if (409 === $status_code) {
+			return [
+				'message' => $data['message'] ?? '授權碼已從本站移除', // @phpstan-ignore-line
+			];
+		}
 
 		if (200 !== $status_code) {
 			throw new \Exception($data['message'] ?? 'unknown error'); // @phpstan-ignore-line

@@ -186,18 +186,21 @@ final class V2Api extends ApiBase {
 	 *
 	 * CloudServer 在授權碼從過期／停用恢復成已啟用時呼叫，body 為 {product_slug, code}。
 	 * code 與本站已存的相同才清快取，讓下一次系統檢查重新 activate；不論任何情況都不刪授權碼，見 Base::refresh()
+	 * 回應一律相同（200 {ok: true}），不透露 code 是否相符
 	 *
 	 * @param \WP_REST_Request $request REST請求對象。
-	 * @return \WP_REST_Response {refreshed: bool}
+	 * @return \WP_REST_Response {ok: true}
 	 */
 	public function post_lc_refresh_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		$body_params  = (array) $request->get_json_params();
 		$product_slug = \is_string( $body_params['product_slug'] ?? null ) ? $body_params['product_slug'] : '';
 		$code         = \is_string( $body_params['code'] ?? null ) ? $body_params['code'] : '';
 
+		Base::refresh( $product_slug, $code );
+
 		return new \WP_REST_Response(
 			[
-				'refreshed' => Base::refresh( $product_slug, $code ),
+				'ok' => true,
 			],
 			200
 		);
