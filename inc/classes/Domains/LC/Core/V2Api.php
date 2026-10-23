@@ -46,6 +46,11 @@ final class V2Api extends ApiBase {
 			'method'              => 'post',
 			'permission_callback' => '__return_true',
 		],
+		[
+			'endpoint'            => 'lc/refresh',
+			'method'              => 'post',
+			'permission_callback' => '__return_true',
+		],
 	];
 
 	/**
@@ -137,8 +142,8 @@ final class V2Api extends ApiBase {
 	/**
 	 * 清除 LC 快取
 	 *
-	 * CloudServer 在授權碼狀態改變時呼叫，body 為 {product_slug, code}。
-	 * 只有 code 與本站已存的授權碼相同才會刪除授權碼，見 Base::invalidate()
+	 * CloudServer 在授權碼狀態改變時呼叫，body 為 {product_slug, code, status}。
+	 * 只有 code 與本站已存的授權碼相同、且 status 為 available（或沒帶）才會刪除授權碼，見 Base::invalidate()
 	 *
 	 * @param \WP_REST_Request $request 包含新增用戶所需資料的REST請求對象。
 	 * @return \WP_REST_Response 返回包含操作結果的REST響應對象。成功時返回用戶資料，失敗時返回錯誤訊息。
@@ -160,7 +165,8 @@ final class V2Api extends ApiBase {
 		\J7\WpUtils\Classes\WC::log($product_slug, 'delete_lc_transient from post_lc_invalidate_callback');
 		// ---------- END TEST ---------- //
 		$code                    = \is_string( $body_params['code'] ?? null ) ? $body_params['code'] : '';
-		$delete_transient_result = Base::invalidate( (string) $product_slug, $code );
+		$status                  = \is_string( $body_params['status'] ?? null ) ? \sanitize_key( $body_params['status'] ) : '';
+		$delete_transient_result = Base::invalidate( (string) $product_slug, $code, $status );
 
 		return new \WP_REST_Response(
 			[
@@ -173,5 +179,27 @@ final class V2Api extends ApiBase {
 			],
 			200
 			);
+	}
+
+	/**
+	 * 授權碼恢復成已啟用時重新檢查
+	 *
+	 * CloudServer 在授權碼從過期／停用恢復成已啟用時呼叫，body 為 {product_slug, code}。
+	 * code 與本站已存的相同才清快取，讓下一次系統檢查重新 activate；不論任何情況都不刪授權碼，見 Base::refresh()
+	 *
+	 * @param \WP_REST_Request $request REST請求對象。
+	 * @return \WP_REST_Response {refreshed: bool}
+	 */
+	public function post_lc_refresh_callback( \WP_REST_Request $request ): \WP_REST_Response {
+		$body_params  = (array) $request->get_json_params();
+		$product_slug = \is_string( $body_params['product_slug'] ?? null ) ? $body_params['product_slug'] : '';
+		$code         = \is_string( $body_params['code'] ?? null ) ? $body_params['code'] : '';
+
+		return new \WP_REST_Response(
+			[
+				'refreshed' => Base::refresh( $product_slug, $code ),
+			],
+			200
+		);
 	}
 }
