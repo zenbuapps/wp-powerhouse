@@ -28,6 +28,11 @@ final class LC extends ApiBase {
 			'method'              => 'post',
 			'permission_callback' => '__return_true',
 		],
+		[
+			'endpoint'            => 'lc/refresh',
+			'method'              => 'post',
+			'permission_callback' => '__return_true',
+		],
 	];
 
 	/**
@@ -38,5 +43,15 @@ final class LC extends ApiBase {
 	 */
 	public function post_lc_invalidate_callback( \WP_REST_Request $request ): \WP_REST_Response {
 		return LC_V2_Api::instance()->post_lc_invalidate_callback( $request );
+	}
+
+	/**
+	 * 授權碼恢復成已啟用時重新檢查（CloudServer 呼叫的是這個命名空間）
+	 *
+	 * @param \WP_REST_Request $request REST請求對象。
+	 * @return \WP_REST_Response {ok: true}
+	 */
+	public function post_lc_refresh_callback( \WP_REST_Request $request ): \WP_REST_Response {
+		return LC_V2_Api::instance()->post_lc_refresh_callback( $request );
 	}
 }
