@@ -37,9 +37,12 @@ module.exports = {
 		commitArgs: ['-n'],
 		push: release,
 		requireCleanWorkingDir: release,
+		requireBranch: 'master', // 第二道防線；完整檢查在 release/assert-release-env.cjs
 	},
 	hooks: {
 		'before:init': [
+			// 必須第一個跑：只允許在 plugins 目錄下的主 checkout、master 建置（v3.6.0 在 worktree 建置，CSS 少了 786 條規則）
+			'node ./release/assert-release-env.cjs',
 			'pnpm build && echo ✅ build success',
 			'pnpm build-css:admin && echo ✅ build admin css success',
 			'pnpm build-css:front && echo ✅ build front css success',
