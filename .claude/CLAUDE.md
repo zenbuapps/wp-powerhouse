@@ -232,8 +232,8 @@ pnpm lint                   # ESLint + PHPCS
 pnpm lint:fix               # Auto-fix
 vendor/bin/phpstan analyse  # PHPStan level 9
 
-# Release
-pnpm release:patch          # Patch release
+# Release（🔴 只能在 plugins 目錄下的主 checkout、master 分支跑，worktree 會產出壞 CSS，見 .claude/rules/release.rule.md）
+pnpm release:patch          # Patch release（before:init 先跑 release/assert-release-env.cjs 檢查環境）
 pnpm sync:version           # Sync version
 pnpm i18n                   # Generate POT
 
@@ -265,9 +265,17 @@ pnpm bootstrap              # composer install
 
 ## 13. CSS Build Pipeline（`#tw` scope + daisyUI scope 修正）
 
-powerhouse 的 Tailwind build 是整個 Power 生態系**唯一**的 CSS 產出點——`tailwind.config.cjs`
+powerhouse 的 Tailwind build 是 Power 生態系主要的 CSS 產出點——`tailwind.config.cjs`
 的 `content` 已把兄弟目錄 `power-*/inc` 與 `power-*/js/src` 一併納入掃描，子外掛（power-shop
 等）不再有自己的 Tailwind pipeline，寫的 class 完全依賴這裡的 build 產出。
+（例外：power-course 自 Issue #285 起另外自產一份 utility CSS，排在這裡的 CSS 之後。）
+
+🔴 **掃描靠相對路徑 `../power-*`，所以 build 的正確性取決於「建置時旁邊放了什麼」**。
+v3.6.0 在 worktree（`C:/Users/User/.ph-release`，旁邊沒有任何 power-* 外掛）建置，
+front.min.css 少 786 條、admin.min.css 少 787 條規則，build 與 release 全部照常成功，
+約 110 站的 power-course 學員「我的課程」整片空白。**發版只能在 WordPress plugins 目錄下的
+主 checkout、master 分支**，由 `release/assert-release-env.cjs` 強制檢查——完整經過、自檢步驟、
+依賴外掛清單見 `.claude/rules/release.rule.md`。
 
 ### `#tw` scope 前提：沒有這個 id，utility 全部靜默失效
 
